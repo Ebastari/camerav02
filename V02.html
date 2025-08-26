@@ -1,0 +1,709 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no, viewport-fit=cover" />
+<title>Monitoring Tanaman — UI Kamera Final (Perbaikan PDF)</title>
+
+<!-- Libraries -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/exceljs/dist/exceljs.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
+
+<style>
+  /* ... (Semua CSS sama persis, tidak perlu diubah) ... */
+  :root {
+    --accent: #2563eb; --muted: #6b7280; --danger: #ef4444;
+    --background-light: #ffffff; --text-light: #f9fafb;
+    --border-light: rgba(255, 255, 255, 0.2);
+  }
+
+  html, body {
+    height: 100%; margin: 0; padding: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: #000; color: #0f172a; overflow: hidden;
+  }
+
+  .camera-ui-container {
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    background: #000; display: flex; flex-direction: column; justify-content: flex-end;
+  }
+
+  #video {
+    position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+    object-fit: cover; z-index: 1;
+  }
+  
+  .live-overlay-box {
+    position: absolute; bottom: 16px; left: 16px;
+    background: rgba(0,0,0,0.6); color: #fff;
+    padding: 8px 12px; border-radius: 8px; font-size: 13px;
+    max-width: 45%; backdrop-filter: blur(5px);
+    z-index: 5;
+    border: 1px solid rgba(255,255,255,0.1);
+    font-family: monospace;
+  }
+  .live-overlay-box b { display: block; margin-bottom: 5px; font-size: 14px; }
+  .live-overlay-box div { line-height: 1.4; }
+
+  .controls-overlay {
+    position: relative; z-index: 10; width: 100%;
+    background: linear-gradient(to top, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.7) 50%, transparent 100%);
+    padding: 16px 0; display: flex; flex-direction: column;
+    align-items: center; gap: 16px; color: var(--text-light); box-sizing: border-box;
+  }
+
+  .main-controls-strip {
+    width: 100%; display: flex;
+    justify-content: space-around; align-items: center; padding: 0 20px; box-sizing: border-box;
+  }
+  .main-controls-strip button {
+    background: rgba(255,255,255,0.15); border: 1px solid var(--border-light);
+    color: #fff; border-radius: 50%; width: 54px; height: 54px;
+    cursor: pointer; font-size: 24px; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+  }
+
+  .quick-options {
+    width: 100%; overflow-x: auto; display: flex; gap: 12px;
+    padding: 0 24px; box-sizing: border-box; -ms-overflow-style: none; scrollbar-width: none;
+  }
+  .quick-options::-webkit-scrollbar { display: none; }
+  .quick-option-btn {
+    padding: 8px 16px; background: rgba(255, 255, 255, 0.15); color: var(--text-light);
+    border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 20px;
+    cursor: pointer; font-size: 14px; white-space: nowrap; transition: background-color 0.2s;
+  }
+  .quick-option-btn.selected {
+    background: var(--accent); color: #fff; border-color: var(--accent); font-weight: 600;
+  }
+  
+  #btnCapture {
+    width: 72px; height: 72px; background-color: transparent;
+    border: 6px solid var(--text-light); border-radius: 50%;
+    cursor: pointer; padding: 3px; box-sizing: border-box;
+    display: flex; justify-content: center; align-items: center; flex-shrink: 0;
+  }
+  # #btnCapture::after {
+    content: ''; width: 100%; height: 100%; background: var(--text-light);
+    border-radius: 50%; transition: transform 0.1s ease-in-out;
+  }
+  #btnCapture:active::after { transform: scale(0.9); }
+
+  .height-control-wrapper {
+    width: 100%; max-width: 400px; text-align: center;
+    padding: 0 24px; box-sizing: border-box;
+  }
+  #tinggiValueDisplay { font-size: 18px; font-weight: 600; color: #fff; margin-bottom: 8px; }
+  #tinggiRange {
+    width: 100%; cursor: pointer; -webkit-appearance: none; background: transparent;
+  }
+  #tinggiRange::-webkit-slider-runnable-track { height: 4px; background: rgba(255, 255, 255, 0.3); border-radius: 2px; }
+  #tinggiRange::-webkit-slider-thumb {
+    -webkit-appearance: none; height: 24px; width: 24px; border-radius: 50%;
+    background: #fff; border: 3px solid var(--accent); margin-top: -10px;
+  }
+
+  .top-controls {
+    position: absolute; top: 0; left: 0; width: 100%; z-index: 10;
+    padding: 16px; padding-top: calc(16px + env(safe-area-inset-top)); box-sizing: border-box;
+    display: flex; justify-content: space-between;
+    background: linear-gradient(to bottom, rgba(0,0,0,0.6), transparent);
+  }
+  .top-controls button {
+    background: rgba(0,0,0,0.5); border: 1px solid var(--border-light);
+    color: #fff; border-radius: 50%; width: 44px; height: 44px;
+    cursor: pointer; font-size: 20px; display: flex; align-items: center; justify-content: center;
+  }
+  
+  .bottom-sheet {
+    position: fixed; bottom: 0; left: 0; width: 100%; height: 90vh;
+    background: #f9fafb; border-top-left-radius: 20px; border-top-right-radius: 20px;
+    box-shadow: 0 -4px 20px rgba(0,0,0,0.2); transform: translateY(100%);
+    transition: transform 0.4s ease-out; z-index: 20; overflow-y: auto;
+    display: flex; flex-direction: column;
+  }
+  .bottom-sheet.visible { transform: translateY(0); }
+  .bottom-sheet-header { padding: 8px; text-align: center; border-bottom: 1px solid #e5e7eb; cursor: pointer; }
+  .handle { width: 40px; height: 5px; background: #d1d5db; border-radius: 3px; margin: 0 auto; }
+  .bottom-sheet-content { padding: 16px; display: flex; flex-direction: column; gap: 20px; }
+
+  label { font-weight: 600; margin-bottom: 6px; display: block; font-size: 14px; }
+  input[type="text"], input[type="number"], select {
+    width: 100%; padding: 12px; border: 1px solid #d1d5db; border-radius: 8px; box-sizing: border-box; font-size: 16px;
+  }
+  .form-btn {
+    width: 100%; padding: 12px; border: 1px solid #d1d5db; border-radius: 8px; box-sizing: border-box; font-size: 16px;
+    background: var(--accent); color: #fff; cursor: pointer; font-weight: 600;
+  }
+  .btn-secondary { background: var(--muted); }
+  .btn-danger { background: var(--danger); }
+  .small { font-size: 13px; color: var(--muted); margin-top: 6px; }
+
+  .form-grid { display: grid; grid-template-columns: 1fr; gap: 12px; }
+  
+  .table-wrapper { overflow-x: auto; border: 1px solid #e5e7eb; border-radius: 8px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; white-space: nowrap; }
+  table thead th { background:#f3f4f6; padding: 10px; text-align: left; }
+  table tbody td { padding: 10px; border-top: 1px solid #e5e7eb; vertical-align: middle; }
+
+  .review-foto { display: grid; grid-template-columns: repeat(auto-fill, minmax(80px, 1fr)); gap: 8px; }
+  .review-foto img { width: 100%; height: 80px; object-fit: cover; border-radius: 6px; border: 1px solid #e5e7eb; }
+  
+  .download-links { display: flex; flex-direction: column; gap: 10px; }
+  .download-links a {
+    padding: 12px; text-align: center; background: var(--accent); color: #fff;
+    text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 15px;
+  }
+
+  @media (min-width: 640px) {
+    .form-grid { grid-template-columns: 1fr 1fr; }
+  }
+</style>
+</head>
+<body>
+
+  <!-- ================== STRUKTUR HTML (Tidak ada perubahan) ================== -->
+  <div class="camera-ui-container">
+    <video id="video" autoplay playsinline></video>
+    <canvas id="canvas" style="display:none;"></canvas>
+    <audio id="shutterSound" src="https://www.soundjay.com/mechanical/camera-shutter-click-03.mp3" preload="auto"></audio>
+
+    <div id="overlayBox" class="live-overlay-box">
+        <b>Ringkasan Live</b>
+        <div id="ovLokasi">Lokasi: -</div>
+        <div id="ovTinggi">Tinggi: -</div>
+        <div id="ovJenis">Jenis: -</div>
+        <div id="ovCount" style="margin-top:6px;">Foto Lokal: 0</div>
+    </div>
+
+    <div class="top-controls">
+        <button id="switchBtn" title="Ganti Kamera">🔄</button>
+        <button id="showDataBtn" title="Tampilkan Data & Form">☰</button>
+    </div>
+
+    <div class="controls-overlay">
+        <div class="height-control-wrapper">
+          <div id="tinggiValueDisplay">10 cm</div>
+          <input type="range" id="tinggiRange" min="10" max="300" value="10">
+        </div>
+
+        <div class="main-controls-strip">
+            <button id="btnGPS_main" title="Ambil Koordinat GPS">📍</button>
+            <div id="btnCapture" title="Ambil Foto"></div>
+            <div style="width: 54px; height: 54px;"></div> 
+        </div>
+
+        <div class="quick-options">
+            <button class="quick-option-btn selected" data-value="Akasia">Akasia</button>
+            <button class="quick-option-btn" data-value="Sengon">Sengon</button>
+            <button class="quick-option-btn" data-value="Jati">Jati</button>
+            <button class="quick-option-btn" data-value="Mahoni">Mahoni</button>
+            <button class="quick-option-btn" data-value="Lainnya">Lainnya...</button>
+        </div>
+    </div>
+  </div>
+
+  <div id="bottomSheet" class="bottom-sheet">
+    <div class="bottom-sheet-header" id="closeSheetHandle">
+      <div class="handle"></div>
+    </div>
+    <div class="bottom-sheet-content">
+      
+      <h3>Data Monitoring</h3>
+      <div class="form-grid">
+        <div><label for="idEntri">ID Entri (Otomatis)</label><input id="idEntri" type="text" placeholder="Dibuat saat foto diambil" readonly></div>
+        <div><label for="tinggi">Tinggi Tanaman (cm)</label><input id="tinggi" type="number" placeholder="Contoh: 120"></div>
+      </div>
+      <div class="form-grid">
+        <div><label for="tahun">Tahun Tanam</label><input id="tahun" type="number" placeholder="2025"></div>
+        <div><label for="pekerjaan">Pekerjaan</label><input id="pekerjaan" type="text" placeholder="Jenis Pekerjaan"></div>
+      </div>
+      <div>
+        <label for="lokasi">Lokasi</label>
+        <input id="lokasi" type="text" placeholder="lat,lon">
+        <div style="display:flex;gap:8px;margin-top:8px">
+          <button id="btnGPS" class="form-btn btn-secondary" type="button">Ambil Koordinat GPS</button>
+          <div id="gpsInfo" class="small" style="align-self:center;">Belum ada data GPS</div>
+        </div>
+      </div>
+      <div><label for="jenis">Jenis Tanaman</label><input id="jenis" type="text" placeholder="Mis: Akasia"></div>
+      <div>
+        <label for="kesehatanTanaman">Kesehatan Tanaman</label>
+        <select id="kesehatanTanaman">
+          <option value="Sehat">Sehat</option><option value="Merana">Merana</option><option value="Mati">Mati</option>
+        </select>
+      </div>
+      <div class="form-grid">
+        <div><label for="pengawas">Pengawas</label><input id="pengawas" type="text" placeholder="Nama Pengawas"></div>
+        <div><label for="vendor">Vendor</label><input id="vendor" type="text" placeholder="Nama Vendor"></div>
+      </div>
+      <div><label for="tim">Tim Pekerja</label><input id="tim" type="text" placeholder="Nama tim/anggota"></div>
+
+      <hr>
+      <h3>Manajemen & Upload</h3>
+      <div class="form-grid">
+          <input id="appsScriptUrl" type="text" placeholder="Apps Script Web App URL" value="https://script.google.com/macros/s/AKfycbyicGY_6DTDDPxhyEgoOKXhuXFpie_ZphBUAphQi9ZZ_b48j1X10QqNwLpfbzyW0g-Ang/exec">
+          <input id="sheetyToken" type="text" placeholder="Sheety Token (opsional)">
+      </div>
+      <div class="form-grid">
+        <button id="kirimBtn" class="form-btn">Kirim (text) ke Spreadsheet</button>
+        <button id="clearFormBtn" class="form-btn btn-secondary">Kosongkan Form</button>
+      </div>
+      <div id="status" class="small">Status: siap</div>
+
+      <hr>
+      <h3>Export & Download</h3>
+      <div class="download-links">
+        <a href="#" id="dlExcel">Download Excel (with images)</a>
+        <a href="#" id="dlPDF">Download PDF</a>
+        <a href="#" id="dlKMZ">Download KMZ</a>
+        <a href="#" id="dlZIP">Download ZIP (semua foto)</a>
+        <a href="#" id="dlCSV">Download CSV</a>
+        <a href="#" id="sendWA">Kirim Ringkasan ke WhatsApp</a>
+      </div>
+      
+      <hr>
+      <h3>Preview & Data Lokal</h3>
+      <div>
+        <label>Preview 8 Foto Terakhir</label>
+        <div id="reviewFoto" class="review-foto"></div>
+      </div>
+      <div>
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <label style="margin-bottom:0;">Daftar Entri Lokal</label>
+          <div id="entriesCount" class="small" style="margin:0;">0 entri</div>
+        </div>
+        <div class="table-wrapper" style="margin-top: 8px;">
+          <table id="dataTable">
+            <thead><tr><th>No</th><th>ID</th><th>Tinggi</th><th>Lokasi</th><th>Tahun</th><th>Jenis</th><th>Tim</th><th>Tanggal</th><th>Kesehatan</th><th>Aksi</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <div style="margin-top:10px; display:flex; gap:8px; align-items:center;">
+          <button id="prevBtn" class="form-btn btn-secondary">‹</button>
+          <span id="pageInfo"></span>
+          <button id="nextBtn" class="form-btn btn-secondary">›</button>
+        </div>
+      </div>
+
+      <hr>
+      <h3>Zona Berbahaya</h3>
+      <div class="form-grid">
+        <button id="clearAllLocalBtn" class="form-btn btn-danger">Hapus Semua Data Lokal</button>
+        <a href="#" id="resetBtn" class="form-btn btn-danger" style="text-decoration:none;">Reset Data (Sama)</a>
+      </div>
+    </div>
+  </div>
+
+
+<script>
+// ================= SCRIPT LENGKAP =================
+
+/* ================= STATE & DOM ================= */
+let data = [];
+let currentStream = null;
+let currentDeviceId = null;
+let lastGPS = { koordinat: "0,0", akurasi: "Tidak tersedia" };
+let currentPage = 1;
+const itemsPerPage = 10;
+let lastDownloadedBatchIndex = 0;
+
+// DOM refs
+const switchBtn = document.getElementById('switchBtn');
+const video = document.getElementById('video');
+const btnCapture = document.getElementById('btnCapture');
+const canvas = document.getElementById('canvas');
+const shutterSound = document.getElementById('shutterSound');
+const reviewFoto = document.getElementById('reviewFoto');
+const btnGPS = document.getElementById('btnGPS');
+const gpsInfo = document.getElementById('gpsInfo');
+const statusText = document.getElementById('status');
+const entriesCount = document.getElementById('entriesCount');
+const idEntriInput = document.getElementById('idEntri');
+const tinggiInput = document.getElementById('tinggi');
+const tahunInput = document.getElementById('tahun');
+const pekerjaanInput = document.getElementById('pekerjaan');
+const lokasiInput = document.getElementById('lokasi');
+const jenisInput = document.getElementById('jenis');
+const timInput = document.getElementById('tim');
+const kesehatanSelect = document.getElementById('kesehatanTanaman');
+const pengawasInput = document.getElementById('pengawas');
+const vendorInput = document.getElementById('vendor');
+const ovLokasi = document.getElementById('ovLokasi');
+const ovTinggi = document.getElementById('ovTinggi');
+const ovJenis = document.getElementById('ovJenis');
+const ovCount = document.getElementById('ovCount');
+const dataTableBody = document.querySelector('#dataTable tbody');
+const pageInfo = document.getElementById('pageInfo');
+const appsScriptUrlInput = document.getElementById('appsScriptUrl');
+const kirimBtn = document.getElementById('kirimBtn');
+const clearFormBtn = document.getElementById('clearFormBtn');
+const clearAllLocalBtn = document.getElementById('clearAllLocalBtn');
+const dlExcel = document.getElementById('dlExcel');
+const dlPDF = document.getElementById('dlPDF');
+const dlKMZ = document.getElementById('dlKMZ');
+const dlZIP = document.getElementById('dlZIP');
+const dlCSV = document.getElementById('dlCSV');
+const sendWA = document.getElementById('sendWA');
+const resetBtn = document.getElementById('resetBtn');
+const nextBtn = document.getElementById('nextBtn');
+const prevBtn = document.getElementById('prevBtn');
+
+/* ================= INIT ================= */
+document.addEventListener('DOMContentLoaded', () => {
+    loadData();
+    listCameras();
+    updateTabel();
+    renderReview();
+    updateEntriesCount();
+    setupUIControllers();
+    updateOverlay();
+});
+
+if (localStorage.getItem('appsScriptUrl')) {
+    appsScriptUrlInput.value = localStorage.getItem('appsScriptUrl');
+}
+appsScriptUrlInput.addEventListener('input', () => {
+    localStorage.setItem('appsScriptUrl', appsScriptUrlInput.value);
+});
+
+
+/* ================= CAMERA & GPS (Tidak ada perubahan) ================= */
+async function listCameras() {
+  if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) return;
+  try {
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    const videoDevices = devices.filter(d => d.kind === 'videoinput');
+    if (videoDevices.length) {
+      const preferredCamera = videoDevices.find(d => d.label.toLowerCase().includes('back')) || videoDevices[0];
+      startCamera(preferredCamera.deviceId);
+    }
+  } catch (err) { console.error('listCameras error', err); }
+}
+
+async function startCamera(deviceId) {
+  if (currentStream) currentStream.getTracks().forEach(t => t.stop());
+  try {
+    const constraints = { video: { deviceId: deviceId ? { exact: deviceId } : undefined, facingMode: 'environment' } };
+    const s = await navigator.mediaDevices.getUserMedia(constraints);
+    video.srcObject = s;
+    currentStream = s;
+    const currentCamSettings = s.getVideoTracks()[0].getSettings();
+    currentDeviceId = currentCamSettings.deviceId;
+  } catch (err) { console.error('startCamera error', err); alert('Gagal mengakses kamera: ' + (err.message || err)); }
+}
+
+function ambilGPS() {
+  gpsInfo.textContent = "Mengambil...";
+  const mainGpsBtn = document.getElementById('btnGPS_main');
+  if(mainGpsBtn) mainGpsBtn.textContent = '...';
+
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(pos => {
+      const lat = pos.coords.latitude.toFixed(6);
+      const lon = pos.coords.longitude.toFixed(6);
+      const acc = pos.coords.accuracy.toFixed(2);
+      lastGPS = { koordinat: `${lat},${lon}`, akurasi: acc };
+      gpsInfo.textContent = `Koordinat: ${lat},${lon} (±${acc} m)`;
+      lokasiInput.value = `${lat},${lon}`;
+      if(mainGpsBtn) mainGpsBtn.textContent = '✅';
+      updateOverlay();
+      setTimeout(() => { if(mainGpsBtn) mainGpsBtn.textContent = '📍'; }, 2000);
+    }, err => {
+      gpsInfo.textContent = "Gagal mengambil GPS";
+      if(mainGpsBtn) mainGpsBtn.textContent = '❌';
+      setTimeout(() => { if(mainGpsBtn) mainGpsBtn.textContent = '📍'; }, 2000);
+    }, { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 });
+  } else {
+    gpsInfo.textContent = "Geolocation tidak didukung";
+  }
+}
+
+/* ================= OVERLAY UPDATE (Tidak ada perubahan) ================= */
+function updateOverlay() {
+  ovLokasi.textContent = 'Lokasi: ' + (lokasiInput.value || '-');
+  ovTinggi.textContent = 'Tinggi: ' + (tinggiInput.value || '-');
+  ovJenis.textContent = 'Jenis: ' + (jenisInput.value || '-');
+  ovCount.textContent = 'Foto Lokal: ' + data.length;
+}
+[lokasiInput, tinggiInput, jenisInput, timInput].forEach(el => el.addEventListener('input', updateOverlay));
+
+
+function generateTimestampId() {
+    const d = new Date();
+    const pad = (n) => n.toString().padStart(2, '0');
+    const datePart = `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}`;
+    const timePart = `${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`;
+    return `${datePart}-${timePart}`;
+}
+
+
+/* ================= CAPTURE ================= */
+btnCapture.addEventListener('click', async function captureHandler() {
+  try { shutterSound.play().catch(()=>{}); } catch(e){}
+  
+  const id = generateTimestampId();
+  idEntriInput.value = id;
+  
+  const tinggi = (tinggiInput.value || '').toString();
+  const lokasi = (lokasiInput.value || '').toString();
+  const pekerjaan = (pekerjaanInput.value || '').toString();
+  const tahun = (tahunInput.value || '').toString();
+  const jenis = (jenisInput.value || '').toString();
+  const tim = (timInput.value || '').toString();
+  const kesehatan = (kesehatanSelect.value || '').toString();
+  const pengawas = (pengawasInput.value || '').toString();
+  const vendor = (vendorInput.value || '').toString();
+  const tanggal = new Date().toLocaleString('id-ID');
+  const [lat, lon] = lastGPS.koordinat.split(',').map(s => s.trim());
+  const xCoord = lon || '0'; const yCoord = lat || '0';
+
+  if (!video || !video.videoWidth) { alert('Video belum siap.'); return; }
+
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
+  const ctx = canvas.getContext('2d');
+  ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+  const margin = 20;
+  const lineHeight = Math.max(20, Math.round(canvas.height * 0.022));
+  ctx.font = `bold ${lineHeight}px sans-serif`;
+  ctx.fillStyle = 'rgba(255,255,255,0.95)';
+  ctx.strokeStyle = 'rgba(0,0,0,0.8)';
+  ctx.lineWidth = Math.max(3, Math.round(lineHeight * 0.15));
+  
+  const lines = [`Lokasi: ${lokasi}`,`Tinggi: ${tinggi} cm`,`Jenis: ${jenis}`,`Koordinat: ${lastGPS.koordinat}`,`Akurasi: ±${lastGPS.akurasi} m`,`Tanggal: ${tanggal}`];
+  
+  lines.forEach((txt, idx) => {
+    const py = canvas.height - margin - (lines.length - 1 - idx) * (lineHeight + 8);
+    ctx.strokeText(txt, margin, py);
+    ctx.fillText(txt, margin, py);
+  });
+  const wmText = "PT ENERGI BATUBARA LESTARI";
+  ctx.font = `bold ${Math.round(lineHeight * 0.8)}px sans-serif`;
+  const wmWidth = ctx.measureText(wmText).width;
+  ctx.strokeText(wmText, canvas.width - margin - wmWidth, margin + lineHeight);
+  ctx.fillText(wmText, canvas.width - margin - wmWidth, margin + lineHeight);
+
+  const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
+
+  try {
+    const blob = dataURLtoBlob(dataUrl);
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `foto_${safeFilename(id)}.jpg`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(link.href);
+  } catch (err) {
+    console.warn('Gagal download foto otomatis:', err);
+    statusText.textContent = 'Download otomatis gagal, data tetap tersimpan.';
+  }
+
+  const appsScriptUrl = appsScriptUrlInput.value.trim();
+  if (appsScriptUrl) {
+    const payload = { ID: id, Tanggal: tanggal, Lokasi: lokasi, Pekerjaan: pekerjaan, TInggi: tinggi, Koordinat: lastGPS.koordinat, X: xCoord, Y: yCoord, Tanaman: jenis, "Tahun Tanam": tahun, Pengawas: pengawas, Vendor: vendor, Gambar: dataUrl };
+    statusText.textContent = 'Mengirim data ke Spreadsheet...';
+    fetch(appsScriptUrl, { method: 'POST', mode: 'no-cors', body: JSON.stringify(payload) })
+    .then(() => { statusText.textContent = `Data ID ${id} terkirim.`; })
+    .catch(err => { console.warn('Gagal kirim ke Apps Script', err); statusText.textContent = 'Gagal kirim — data tetap disimpan lokal'; });
+  } else { statusText.textContent = 'Apps Script URL kosong, data tidak dikirim ke Spreadsheet.'; }
+
+  const entry = { id, tanggal, lokasi, pekerjaan, tahun, jenis, tim, tinggi, kesehatan, koordinat: lastGPS.koordinat, akurasi: lastGPS.akurasi, x: xCoord, y: yCoord, pengawas, vendor, foto: dataUrl };
+  data.push(entry);
+  saveData();
+  renderReview();
+  updateTabel();
+  updateEntriesCount();
+  updateOverlay();
+});
+
+
+/* ================= STORAGE & DATA MANAGEMENT (Tidak ada perubahan) ================= */
+function saveData() { localStorage.setItem('monitoringData', JSON.stringify(data)); }
+function loadData() { try { data = JSON.parse(localStorage.getItem('monitoringData') || '[]'); } catch(e) { data = []; } }
+
+function updateEntriesCount(){ entriesCount.textContent = data.length + ' entri'; }
+function renderReview() {
+  reviewFoto.innerHTML = '';
+  data.slice(-8).reverse().forEach(d => {
+    const img = document.createElement('img');
+    img.src = d.foto || '';
+    reviewFoto.appendChild(img);
+  });
+}
+
+function updateTabel() {
+  dataTableBody.innerHTML = '';
+  const totalPages = Math.max(1, Math.ceil(data.length / itemsPerPage));
+  if (currentPage > totalPages) currentPage = totalPages;
+  const start = (currentPage - 1) * itemsPerPage;
+  const pageItems = data.slice(start, start + itemsPerPage);
+  pageItems.forEach((item, idx) => {
+    const i = start + idx;
+    const tr = document.createElement('tr');
+    tr.dataset.index = i;
+    tr.innerHTML = `<td>${i+1}</td><td>${escapeHtml(item.id)}</td><td>${escapeHtml(item.tinggi)}</td><td>${escapeHtml(item.lokasi)}</td><td>${escapeHtml(item.tahun)}</td><td>${escapeHtml(item.jenis)}</td><td>${escapeHtml(item.tim)}</td><td>${escapeHtml(item.tanggal)}</td><td>${escapeHtml(item.kesehatan)}</td><td><button onclick="deleteRow(${i})">Hapus</button></td>`;
+    dataTableBody.appendChild(tr);
+  });
+  pageInfo.textContent = `Halaman ${currentPage} / ${totalPages}`;
+}
+
+window.deleteRow = function(index) {
+    if (!confirm('Hapus data ini?')) return;
+    data.splice(index, 1);
+    saveData();
+    updateTabel();
+    renderReview();
+    updateEntriesCount();
+};
+nextBtn.addEventListener('click', () => { const totalPages = Math.max(1, Math.ceil(data.length / itemsPerPage)); if (currentPage < totalPages) { currentPage++; updateTabel(); }});
+prevBtn.addEventListener('click', () => { if (currentPage > 1) { currentPage--; updateTabel(); }});
+
+/* ================= EXPORT & DOWNLOAD FUNCTIONS ================= */
+dlExcel.addEventListener('click', async (ev) => {
+  ev.preventDefault(); if (!data.length) return alert('Tidak ada data.');
+  const workbook = new ExcelJS.Workbook();
+  const sheet = workbook.addWorksheet('Monitoring');
+  sheet.columns = [ {header:'No',key:'no'}, {header:'ID',key:'id'}, {header:'Tanggal',key:'tanggal'}, {header:'Lokasi',key:'lokasi'}, {header:'Pekerjaan',key:'pekerjaan'}, {header:'Tinggi (cm)',key:'tinggi'}, {header:'Koordinat',key:'koordinat'}, {header:'X',key:'x'}, {header:'Y',key:'y'}, {header:'Tanaman',key:'jenis'}, {header:'Tahun Tanam',key:'tahun'}, {header:'Pengawas',key:'pengawas'}, {header:'Vendor',key:'vendor'}, {header:'Kesehatan',key:'kesehatan'}, {header:'Gambar',key:'gambar'} ];
+  for (let i=0;i<data.length;i++){
+      const d = data[i]; const row = sheet.addRow({ no:i+1, id:d.id, tanggal:d.tanggal, lokasi:d.lokasi, pekerjaan:d.pekerjaan, tinggi:d.tinggi, koordinat:d.koordinat, x:d.x, y:d.y, jenis:d.jenis, tahun:d.tahun, pengawas:d.pengawas, vendor:d.vendor, kesehatan:d.kesehatan });
+      if (d.foto) { const base64 = d.foto.split(',')[1]; if (base64) { try { const imageId = workbook.addImage({ base64: base64, extension: 'jpeg' }); sheet.addImage(imageId, { tl: { col: 14, row: row.number - 1 }, ext: { width: 120, height: 80 } }); row.height = 60; } catch(e){ console.error("Gagal menambahkan gambar ke Excel:", e)} } }
+  }
+  const buffer = await workbook.xlsx.writeBuffer(); 
+  saveAs(new Blob([buffer]), 'monitoring_tanaman.xlsx');
+});
+
+dlPDF.addEventListener('click', (ev) => {
+    ev.preventDefault();
+    if (!data.length) { return alert('Tidak ada data.'); }
+    
+    //-- DIUBAH: Cara pemanggilan jsPDF diperbaiki agar autoTable berfungsi --//
+    const doc = new window.jspdf.jsPDF({ orientation: 'landscape' });
+    
+    doc.text('Laporan Monitoring Tanaman', 14, 14);
+    const rows = data.map((d, i) => [i + 1, d.id, d.tanggal, d.lokasi, d.pekerjaan, d.tinggi, d.koordinat, d.x, d.y, d.jenis, d.tahun, d.pengawas, d.vendor, d.kesehatan, '']);
+    
+    doc.autoTable({
+        head: [['No', 'ID', 'Tanggal', 'Lokasi', 'Pekerjaan', 'Tinggi(cm)', 'Koordinat', 'X', 'Y', 'Tanaman', 'Tahun Tanam', 'Pengawas', 'Vendor', 'Kesehatan', 'Gambar']],
+        body: rows,
+        startY: 24,
+        styles: { fontSize: 8 },
+        columnStyles: { 14: { cellWidth: 20 } },
+        didDrawCell: function(dataCell) {
+            if (dataCell.section === 'body' && dataCell.column.index === 14) {
+                const imgData = data[dataCell.row.index].foto;
+                if (imgData) {
+                    try {
+                        doc.addImage(imgData, 'JPEG', dataCell.cell.x + 2, dataCell.cell.y + 2, 16, 16);
+                    } catch(e) {
+                        console.error("Gagal menambahkan gambar ke PDF:", e);
+                    }
+                }
+            }
+        }
+    });
+    
+    doc.save(`monitoring_tanaman.pdf`);
+});
+
+dlCSV.addEventListener('click', (ev) => {
+    ev.preventDefault(); if (!data.length) return alert('Tidak ada data.');
+    let csv = "ID,Tanggal,Lokasi,Pekerjaan,Tinggi,Koordinat,X,Y,Tanaman,Tahun Tanam,Pengawas,Vendor,Kesehatan,Akurasi\n";
+    data.forEach(d => { csv += `"${d.id}","${d.tanggal}","${d.lokasi}","${d.pekerjaan||''}","${d.tinggi}","${d.koordinat}","${d.x}","${d.y}","${d.jenis}","${d.tahun}","${d.pengawas||''}","${d.vendor||''}","${d.kesehatan}","${d.akurasi}"\n`; });
+    saveAs(new Blob([csv], {type:'text/csv;charset=utf-8;'}), 'monitoring_tanaman.csv');
+});
+dlZIP.addEventListener('click', async (ev) => {
+    ev.preventDefault(); if (!data.length) return alert('Tidak ada data.');
+    const zip = new JSZip(); let csv = "No,ID,Tanggal,Tinggi,Lokasi,Pekerjaan,Tahun,Jenis,Tim,Kesehatan,Koordinat,X,Y,Akurasi,Pengawas,Vendor\n";
+    data.forEach((d,i)=>{ csv += `${i+1},"${d.id}","${d.tanggal}",${d.tinggi},"${d.lokasi}","${d.pekerjaan||''}",${d.tahun},"${d.jenis}","${d.tim}","${d.kesehatan}","${d.koordinat}",${d.x},${d.y},${d.akurasi},"${d.pengawas||''}","${d.vendor||''}"\n`; if(d.foto){const base64=d.foto.split(',')[1];if(base64)zip.file(`gambar_${i+1}_ID_${d.id}.jpg`,base64,{base64:true});} });
+    zip.file('data_all.csv', csv); const blob = await zip.generateAsync({type:'blob'}); 
+    saveAs(blob, 'monitoring_all_images.zip');
+});
+dlKMZ.addEventListener('click', async (ev) => {
+    ev.preventDefault(); if (!data.length) return alert('Tidak ada data.');
+    let kml = `<?xml version="1.0" encoding="UTF-8"?><kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>Monitoring Tanaman</name>`;
+    data.forEach((d,i)=>{ const coords = (d.x&&d.y)?`${d.x},${d.y},0`:'0,0,0'; kml += `<Placemark><name>${escapeXml(d.jenis||'Tanaman')} (ID: ${escapeXml(d.id)})</name><description><![CDATA[<img src="files/gambar_${i+1}_ID_${d.id}.jpg" width="300"/><br/>ID: ${escapeXml(d.id)}<br/>Lokasi: ${escapeXml(d.lokasi||'')}<br/>Tinggi: ${escapeXml(d.tinggi)} cm<br/>Jenis: ${escapeXml(d.jenis||'')}<br/>Kesehatan: ${escapeXml(d.kesehatan||'')}]]></description><Point><coordinates>${coords}</coordinates></Point></Placemark>`; });
+    kml += `</Document></kml>`; const zip = new JSZip(); zip.file('doc.kml',kml); data.forEach((d,i)=>{if(d.foto){const b64=d.foto.split(',')[1];if(b64)zip.file(`files/gambar_${i+1}_ID_${d.id}.jpg`,b64,{base64:true});}});
+    const blob = await zip.generateAsync({type:'blob'}); 
+    saveAs(blob, 'monitoring.kmz');
+});
+sendWA.addEventListener('click', (ev) => {
+    ev.preventDefault(); if (!data.length) return alert('Tidak ada data.');
+    const wa = '6281122220044'; let msg = 'Ringkasan Monitoring:\n\n';
+    data.slice(-5).forEach((d,i)=>{ msg += `${data.length - 4 + i}. ID:${d.id}, Jenis:${d.jenis}, Tinggi:${d.tinggi}cm, Lok:${d.lokasi}\n`; });
+    const url = `https://wa.me/${wa}?text=${encodeURIComponent(msg)}`; window.open(url, '_blank');
+});
+
+/* ================= HELPERS & UI CONTROLLERS ================= */
+function escapeHtml(s){ const el = document.createElement('div'); el.innerText = s || ''; return el.innerHTML; }
+function escapeXml(s){ return String(s||'').replace(/[<>&"']/g, c=>`&#${c.charCodeAt(0)};`); }
+function safeFilename(s){ return String(s || '').replace(/[^\w.-]/g, '_'); }
+function dataURLtoBlob(dataurl){ const arr = dataurl.split(','), mime = (arr[0].match(/:(.*?);/)||[])[1]||'image/jpeg', bstr = atob(arr[1]); let n = bstr.length; const u8arr = new Uint8Array(n); while(n--) u8arr[n] = bstr.charCodeAt(n); return new Blob([u8arr], {type:mime}); }
+
+function setupUIControllers() {
+    const bottomSheet = document.getElementById('bottomSheet');
+    const showDataBtn = document.getElementById('showDataBtn');
+    const closeSheetHandle = document.getElementById('closeSheetHandle');
+    const toggleSheet = () => bottomSheet.classList.toggle('visible');
+    showDataBtn.addEventListener('click', toggleSheet);
+    closeSheetHandle.addEventListener('click', toggleSheet);
+    
+    document.getElementById('btnGPS_main').addEventListener('click', ambilGPS);
+    switchBtn.addEventListener('click', async () => {
+        if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) return;
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const videoDevices = devices.filter(d => d.kind === 'videoinput');
+        if (videoDevices.length <= 1) return;
+        const currentIndex = videoDevices.findIndex(opt => opt.deviceId === currentDeviceId);
+        const nextIndex = (currentIndex + 1) % videoDevices.length;
+        startCamera(videoDevices[nextIndex].deviceId);
+    });
+
+    const tinggiRange = document.getElementById('tinggiRange');
+    const tinggiValueDisplay = document.getElementById('tinggiValueDisplay');
+    tinggiRange.addEventListener('input', () => {
+        tinggiValueDisplay.textContent = `${tinggiRange.value} cm`;
+        tinggiInput.value = tinggiRange.value;
+        updateOverlay();
+    });
+    tinggiInput.addEventListener('input', () => {
+        const val = parseInt(tinggiInput.value, 10);
+        if(!isNaN(val)) {
+            tinggiValueDisplay.textContent = `${val} cm`;
+            tinggiRange.value = val;
+            updateOverlay();
+        }
+    });
+    tinggiInput.value = tinggiRange.value;
+
+    const quickOptionBtns = document.querySelectorAll('.quick-option-btn');
+    quickOptionBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            quickOptionBtns.forEach(b => b.classList.remove('selected'));
+            btn.classList.add('selected');
+            const value = btn.dataset.value;
+            if (value === 'Lainnya') {
+                jenisInput.value = '';
+                if (!bottomSheet.classList.contains('visible')) toggleSheet();
+                setTimeout(() => jenisInput.focus(), 400);
+            } else {
+                jenisInput.value = value;
+            }
+            updateOverlay();
+        });
+    });
+    jenisInput.value = document.querySelector('.quick-option-btn.selected').dataset.value;
+    
+    resetBtn.addEventListener('click', (ev) => { ev.preventDefault(); if(confirm('HAPUS SEMUA DATA LOKAL? Aksi ini tidak dapat dibatalkan.')){ data=[]; saveData(); updateTabel(); renderReview(); updateEntriesCount(); idEntriInput.value = ''; updateOverlay();} });
+    clearAllLocalBtn.addEventListener('click', ()=>{ if(confirm('HAPUS SEMUA DATA LOKAL?')){ data=[]; saveData(); updateTabel(); renderReview(); updateEntriesCount(); idEntriInput.value = ''; updateOverlay();} });
+    if(clearFormBtn) clearFormBtn.addEventListener('click', () => { document.querySelectorAll('input[type="text"], input[type="number"]').forEach(input => { if(input.id !== 'idEntri' && input.id !== 'appsScriptUrl') input.value = ''; }); updateOverlay(); });
+    kirimBtn.addEventListener('click', () => { alert('Fungsi ini untuk mengirim data teks saja. Pengiriman utama terjadi saat mengambil foto.'); });
+}
+</script>
+</body>
+</html>
