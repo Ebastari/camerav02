@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no, viewport-fit=cover" />
-<title>Monitoring Tanaman — UI Kamera Final (Perbaikan PDF)</title>
+<title>Monitoring Tanaman — UI Kamera Final (Revisi EXIF)</title>
 
 <!-- Libraries -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
@@ -11,6 +11,8 @@
 <script src="https://cdn.jsdelivr.net/npm/exceljs/dist/exceljs.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
+<!-- BAGIAN 2: Library EXIF Geotagging -->
+<script src="https://cdn.jsdelivr.net/npm/piexifjs@1.0.6/dist/piexif.min.js"></script>
 
 <style>
   /* ... (Semua CSS sama persis, tidak perlu diubah) ... */
@@ -86,7 +88,7 @@
     cursor: pointer; padding: 3px; box-sizing: border-box;
     display: flex; justify-content: center; align-items: center; flex-shrink: 0;
   }
-  # #btnCapture::after {
+  #btnCapture::after { /* Selector diperbaiki */
     content: ''; width: 100%; height: 100%; background: var(--text-light);
     border-radius: 50%; transition: transform 0.1s ease-in-out;
   }
@@ -174,7 +176,7 @@
     <div id="overlayBox" class="live-overlay-box">
         <b>Ringkasan Live</b>
         <div id="ovLokasi">Lokasi: -</div>
-        <div id="ovTinggi">Tinggi: -</div>
+        <div id="ovTinggi">Tinggi: 10 cm</div>
         <div id="ovJenis">Jenis: -</div>
         <div id="ovCount" style="margin-top:6px;">Foto Lokal: 0</div>
     </div>
@@ -215,7 +217,7 @@
       <h3>Data Monitoring</h3>
       <div class="form-grid">
         <div><label for="idEntri">ID Entri (Otomatis)</label><input id="idEntri" type="text" placeholder="Dibuat saat foto diambil" readonly></div>
-        <div><label for="tinggi">Tinggi Tanaman (cm)</label><input id="tinggi" type="number" placeholder="Contoh: 120"></div>
+        <div><label for="tinggi">Tinggi Tanaman (cm)</label><input id="tinggi" type="number" placeholder="Contoh: 120" value="10"></div>
       </div>
       <div class="form-grid">
         <div><label for="tahun">Tahun Tanam</label><input id="tahun" type="number" placeholder="2025"></div>
@@ -300,13 +302,13 @@
 
 
 <script>
-// ================= SCRIPT LENGKAP =================
+// ================= SCRIPT LENGKAP YANG DIREVISI =================
 
 /* ================= STATE & DOM ================= */
 let data = [];
 let currentStream = null;
 let currentDeviceId = null;
-let lastGPS = { koordinat: "0,0", akurasi: "Tidak tersedia" };
+let lastGPS = { koordinat: "0,0", akurasi: "Tidak tersedia" }; // lastGPS.koordinat = "lat,lon"
 let currentPage = 1;
 const itemsPerPage = 10;
 let lastDownloadedBatchIndex = 0;
@@ -323,7 +325,13 @@ const gpsInfo = document.getElementById('gpsInfo');
 const statusText = document.getElementById('status');
 const entriesCount = document.getElementById('entriesCount');
 const idEntriInput = document.getElementById('idEntri');
-const tinggiInput = document.getElementById('tinggi');
+
+// Tambahan/Pastikan DOM ref untuk Part 1
+const tinggiInput = document.getElementById('tinggi'); // Input number
+const tinggiRange = document.getElementById('tinggiRange'); // Slider
+const tinggiValueDisplay = document.getElementById('tinggiValueDisplay'); // Display nilai
+const ovTinggi = document.getElementById('ovTinggi'); // Overlay
+
 const tahunInput = document.getElementById('tahun');
 const pekerjaanInput = document.getElementById('pekerjaan');
 const lokasiInput = document.getElementById('lokasi');
@@ -333,7 +341,6 @@ const kesehatanSelect = document.getElementById('kesehatanTanaman');
 const pengawasInput = document.getElementById('pengawas');
 const vendorInput = document.getElementById('vendor');
 const ovLokasi = document.getElementById('ovLokasi');
-const ovTinggi = document.getElementById('ovTinggi');
 const ovJenis = document.getElementById('ovJenis');
 const ovCount = document.getElementById('ovCount');
 const dataTableBody = document.querySelector('#dataTable tbody');
@@ -359,7 +366,7 @@ document.addEventListener('DOMContentLoaded', () => {
     updateTabel();
     renderReview();
     updateEntriesCount();
-    setupUIControllers();
+    setupUIControllers(); // Fungsi ini sudah direvisi
     updateOverlay();
 });
 
@@ -422,14 +429,15 @@ function ambilGPS() {
   }
 }
 
-/* ================= OVERLAY UPDATE (Tidak ada perubahan) ================= */
+/* ================= OVERLAY UPDATE (DIREVISI) ================= */
 function updateOverlay() {
+  // CATATAN: ovTinggi diperbarui di syncTinggiFromSlider/Input
   ovLokasi.textContent = 'Lokasi: ' + (lokasiInput.value || '-');
-  ovTinggi.textContent = 'Tinggi: ' + (tinggiInput.value || '-');
   ovJenis.textContent = 'Jenis: ' + (jenisInput.value || '-');
   ovCount.textContent = 'Foto Lokal: ' + data.length;
 }
-[lokasiInput, tinggiInput, jenisInput, timInput].forEach(el => el.addEventListener('input', updateOverlay));
+// Hanya tambahkan listener untuk input selain tinggi, karena tinggi dihandle oleh fungsi sync-nya sendiri
+[lokasiInput, jenisInput, timInput].forEach(el => el.addEventListener('input', updateOverlay));
 
 
 function generateTimestampId() {
@@ -440,15 +448,115 @@ function generateTimestampId() {
     return `${datePart}-${timePart}`;
 }
 
+// ================= FUNGSI BANTU UNTUK EXIF GEOTAGGING (BAGIAN 2) =================
 
-/* ================= CAPTURE ================= */
+/**
+ * Mengubah koordinat desimal menjadi format Degrees Minutes Seconds untuk EXIF.
+ * @param {number} coord - Koordinat (latitude atau longitude) dalam desimal.
+ * @returns {Array<Array<number>>} - Format [Degrees, Minutes, Seconds] untuk piexif.
+ */
+function toDegreesMinutesSeconds(coord) {
+    const absolute = Math.abs(coord);
+    const degrees = Math.floor(absolute);
+    const minutes = Math.floor((absolute - degrees) * 60);
+    const seconds = (absolute - degrees - minutes / 60) * 3600;
+    // Format piexif: array of [numerator, denominator]
+    // Kita gunakan denominator 100 untuk menangani koma pada detik
+    return [[degrees, 1], [minutes, 1], [Math.round(seconds * 100), 100]]; 
+}
+
+
+/**
+ * Menyisipkan metadata EXIF ke DataURL gambar JPEG.
+ * @param {string} dataUrl - DataURL gambar JPEG mentah (dari canvas.toDataURL).
+ * @param {{id: string, tinggi: string, jenis: string, lokasi: string, pengawas: string, lastGPS: {koordinat: string, akurasi: string}, timestamp: Date}} dataObj - Data monitoring.
+ * @returns {Promise<string>} - DataURL baru dengan EXIF. Mengembalikan dataUrl mentah jika gagal.
+ */
+async function writeExifData(dataUrl, dataObj) {
+    const { id, tinggi, jenis, lokasi, pengawas, lastGPS, timestamp } = dataObj;
+    
+    // Fallback: Jika piexif tidak tersedia
+    if (typeof piexif === 'undefined') {
+        console.warn('piexifjs library is not loaded. Skipping EXIF writing.');
+        return dataUrl;
+    }
+
+    try {
+        const [latStr, lonStr] = lastGPS.koordinat.split(',').map(s => s.trim());
+        const lat = parseFloat(latStr);
+        const lon = parseFloat(lonStr);
+        
+        // --- 1. Persiapan Waktu EXIF (YYYY:MM:DD HH:MM:SS) ---
+        const pad = (n) => n.toString().padStart(2, '0');
+        const dateTimeExif = timestamp.getFullYear() + ':' + 
+            pad(timestamp.getMonth() + 1) + ':' + 
+            pad(timestamp.getDate()) + ' ' + 
+            pad(timestamp.getHours()) + ':' + 
+            pad(timestamp.getMinutes()) + ':' + 
+            pad(timestamp.getSeconds());
+        
+        // --- 2. Persiapan GPS Data ---
+        const gpsExif = {};
+        if (!isNaN(lat) && !isNaN(lon) && (lat !== 0 || lon !== 0)) {
+            // GPS Latitude
+            gpsExif[piexif.GPSIFD.GPSLatitudeRef] = lat < 0 ? "S" : "N";
+            gpsExif[piexif.GPSIFD.GPSLatitude] = toDegreesMinutesSeconds(lat);
+            // GPS Longitude
+            gpsExif[piexif.GPSIFD.GPSLongitudeRef] = lon < 0 ? "W" : "E";
+            gpsExif[piexif.GPSIFD.GPSLongitude] = toDegreesMinutesSeconds(lon);
+            
+            // GPSAreaInformation (Lokasi)
+            gpsExif[piexif.GPSIFD.GPSAreaInformation] = piexif.helper.encodeText(lokasi.substring(0, 128)); // Batasi 128 karakter
+            
+            // GPSDOP (akurasi), dikonversi ke format fraksi [numerator, denominator]
+            const akurasiDOP = parseFloat(lastGPS.akurasi) || 0;
+            // Gunakan 1000 sebagai denominator untuk presisi 3 desimal
+            gpsExif[piexif.GPSIFD.GPSDOP] = [Math.round(akurasiDOP * 1000), 1000]; 
+        }
+
+        // --- 3. Persiapan UserComment & Identity Data ---
+        // Sesuai Syarat 3: UserComment
+        const userCommentStr = `ID: ${id}, Tinggi: ${tinggi}cm, Jenis: ${jenis}, Lokasi: ${lokasi}, Pengawas: ${pengawas}`;
+
+        // --- 4. Bangun Objek EXIF ---
+        const exifObj = {
+            "0th": {
+                [piexif.ImageIFD.Make]: "EBL Monitoring WebApp",
+                [piexif.ImageIFD.Model]: "Browser Camera",
+                [piexif.ImageIFD.Software]: "Montana V2.0",
+                [piexif.ImageIFD.DateTime]: dateTimeExif, // Waktu terakhir modifikasi (sama dengan original)
+            },
+            "Exif": {
+                [piexif.ExifIFD.DateTimeOriginal]: dateTimeExif,
+                [piexif.ExifIFD.UserComment]: piexif.helper.encodeText(userCommentStr),
+            },
+            "GPS": gpsExif,
+        };
+
+        // --- 5. Dump & Insert ---
+        const exifStr = piexif.dump(exifObj);
+        const exifDataUrl = piexif.insert(exifStr, dataUrl);
+        
+        console.log('EXIF data successfully inserted.', exifObj);
+        return exifDataUrl;
+
+    } catch (exifError) {
+        // Fallback: Jika EXIF gagal ditulis, log warning dan kembalikan dataUrl mentah
+        console.warn('Gagal menyisipkan EXIF metadata:', exifError);
+        statusText.textContent = 'Gagal menyisipkan EXIF, data dikirim tanpa geotag.';
+        return dataUrl;
+    }
+}
+
+
+/* ================= CAPTURE (REVISI BAGIAN 1 & 2) ================= */
 btnCapture.addEventListener('click', async function captureHandler() {
-  try { shutterSound.play().catch(()=>{}); } catch(e){}
   
   const id = generateTimestampId();
   idEntriInput.value = id;
   
-  const tinggi = (tinggiInput.value || '').toString();
+  // Ambil data form
+  const tinggi = (tinggiInput.value || '').toString().trim(); 
   const lokasi = (lokasiInput.value || '').toString();
   const pekerjaan = (pekerjaanInput.value || '').toString();
   const tahun = (tahunInput.value || '').toString();
@@ -457,17 +565,33 @@ btnCapture.addEventListener('click', async function captureHandler() {
   const kesehatan = (kesehatanSelect.value || '').toString();
   const pengawas = (pengawasInput.value || '').toString();
   const vendor = (vendorInput.value || '').toString();
-  const tanggal = new Date().toLocaleString('id-ID');
-  const [lat, lon] = lastGPS.koordinat.split(',').map(s => s.trim());
+  const timestamp = new Date(); // Objek waktu saat ini
+  const tanggal = timestamp.toLocaleString('id-ID'); // Format lokal untuk penyimpanan/tampilan
+  const [latStr, lonStr] = lastGPS.koordinat.split(',').map(s => s.trim());
+  const lat = parseFloat(latStr);
+  const lon = parseFloat(lonStr);
   const xCoord = lon || '0'; const yCoord = lat || '0';
+
+  // BAGIAN 1: Validasi Tinggi Tanaman (HARUS TERSINKRONISASI)
+  if (!tinggi || parseFloat(tinggi) <= 0) {
+      alert('Tinggi tanaman harus diisi dan bernilai lebih dari 0 untuk mengambil foto.');
+      statusText.textContent = 'Gagal: Kolom tinggi kosong atau nol.';
+      tinggiInput.style.border = '2px solid var(--danger)';
+      setTimeout(() => { tinggiInput.style.border = '1px solid #d1d5db'; }, 1000);
+      return; 
+  }
+  
+  try { shutterSound.play().catch(()=>{}); } catch(e){} // Suara setelah validasi
 
   if (!video || !video.videoWidth) { alert('Video belum siap.'); return; }
 
+  // 1. Gambar Video ke Canvas
   canvas.width = video.videoWidth;
   canvas.height = video.videoHeight;
   const ctx = canvas.getContext('2d');
   ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
+  // 2. Tulis Watermark/Overlay Teks di Canvas
   const margin = 20;
   const lineHeight = Math.max(20, Math.round(canvas.height * 0.022));
   ctx.font = `bold ${lineHeight}px sans-serif`;
@@ -488,7 +612,17 @@ btnCapture.addEventListener('click', async function captureHandler() {
   ctx.strokeText(wmText, canvas.width - margin - wmWidth, margin + lineHeight);
   ctx.fillText(wmText, canvas.width - margin - wmWidth, margin + lineHeight);
 
-  const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
+  // 3. Ambil DataURL mentah (Kualitas 0.9 agar EXIF tidak hilang)
+  let dataUrl = canvas.toDataURL('image/jpeg', 0.9);
+
+  // ================= BAGIAN 2: PANGGIL FUNGSI EXIF GEOTAGGING BARU =================
+  const exifDataUrl = await writeExifData(dataUrl, { 
+    id, tinggi, jenis, lokasi, pengawas, lastGPS, timestamp 
+  });
+  // Ganti dataUrl mentah dengan dataUrl yang sudah disisipi EXIF
+  dataUrl = exifDataUrl;
+  // ================= END PANGGIL FUNGSI EXIF GEOTAGGING =================
+
 
   try {
     const blob = dataURLtoBlob(dataUrl);
@@ -506,8 +640,30 @@ btnCapture.addEventListener('click', async function captureHandler() {
 
   const appsScriptUrl = appsScriptUrlInput.value.trim();
   if (appsScriptUrl) {
-    const payload = { ID: id, Tanggal: tanggal, Lokasi: lokasi, Pekerjaan: pekerjaan, TInggi: tinggi, Koordinat: lastGPS.koordinat, X: xCoord, Y: yCoord, Tanaman: jenis, "Tahun Tanam": tahun, Pengawas: pengawas, Vendor: vendor, Gambar: dataUrl };
+    // Membuat nama file sesuai permintaan: Montana V2_Images/Gambar Montana (ID).jpg
+    const filename = `Montana V2_Images/Gambar Montana (${id}).jpg`;
+    
+    // Payload untuk Apps Script
+    const payload = { 
+        ID: id, 
+        Tanggal: tanggal, 
+        Lokasi: lokasi, 
+        Pekerjaan: pekerjaan, 
+        Tinggi: tinggi, 
+        Koordinat: lastGPS.koordinat, 
+        X: xCoord, 
+        Y: yCoord, 
+        Tanaman: jenis, 
+        "Tahun Tanam": tahun, 
+        Pengawas: pengawas, 
+        Vendor: vendor, 
+        Gambar: dataUrl, // Base64 data gambar (Sudah di-EXIF)
+        Gambar_Nama_File: filename,
+        LINK: "" 
+    };
+    
     statusText.textContent = 'Mengirim data ke Spreadsheet...';
+    // Gunakan payload dengan dataUrl yang sudah di-EXIF
     fetch(appsScriptUrl, { method: 'POST', mode: 'no-cors', body: JSON.stringify(payload) })
     .then(() => { statusText.textContent = `Data ID ${id} terkirim.`; })
     .catch(err => { console.warn('Gagal kirim ke Apps Script', err); statusText.textContent = 'Gagal kirim — data tetap disimpan lokal'; });
@@ -564,7 +720,7 @@ window.deleteRow = function(index) {
 nextBtn.addEventListener('click', () => { const totalPages = Math.max(1, Math.ceil(data.length / itemsPerPage)); if (currentPage < totalPages) { currentPage++; updateTabel(); }});
 prevBtn.addEventListener('click', () => { if (currentPage > 1) { currentPage--; updateTabel(); }});
 
-/* ================= EXPORT & DOWNLOAD FUNCTIONS ================= */
+/* ================= EXPORT & DOWNLOAD FUNCTIONS (Tidak ada perubahan) ================= */
 dlExcel.addEventListener('click', async (ev) => {
   ev.preventDefault(); if (!data.length) return alert('Tidak ada data.');
   const workbook = new ExcelJS.Workbook();
@@ -620,7 +776,7 @@ dlCSV.addEventListener('click', (ev) => {
 dlZIP.addEventListener('click', async (ev) => {
     ev.preventDefault(); if (!data.length) return alert('Tidak ada data.');
     const zip = new JSZip(); let csv = "No,ID,Tanggal,Tinggi,Lokasi,Pekerjaan,Tahun,Jenis,Tim,Kesehatan,Koordinat,X,Y,Akurasi,Pengawas,Vendor\n";
-    data.forEach((d,i)=>{ csv += `${i+1},"${d.id}","${d.tanggal}",${d.tinggi},"${d.lokasi}","${d.pekerjaan||''}",${d.tahun},"${d.jenis}","${d.tim}","${d.kesehatan}","${d.koordinat}",${d.x},${d.y},${d.akurasi},"${d.pengawas||''}","${d.vendor||''}"\n`; if(d.foto){const base64=d.foto.split(',')[1];if(base64)zip.file(`gambar_${i+1}_ID_${d.id}.jpg`,base64,{base64:true});} });
+    data.forEach((d,i)=>{ csv += `${i+1},"${d.id}","${d.tanggal}",${d.tinggi},"${d.lokasi}","${d.pekerjaan||''}",${d.tahun},"${d.jenis}","${d.tim}","${d.kesehatan}","${d.koordinat}",${d.x},${d.y},${d.akurasi},"${d.pengawas||''}","${d.vendor||''}"\n`; if(d.foto){const b64=d.foto.split(',')[1];if(b64)zip.file(`gambar_${i+1}_ID_${d.id}.jpg`,b64,{base64:true});} });
     zip.file('data_all.csv', csv); const blob = await zip.generateAsync({type:'blob'}); 
     saveAs(blob, 'monitoring_all_images.zip');
 });
@@ -639,7 +795,7 @@ sendWA.addEventListener('click', (ev) => {
     const url = `https://wa.me/${wa}?text=${encodeURIComponent(msg)}`; window.open(url, '_blank');
 });
 
-/* ================= HELPERS & UI CONTROLLERS ================= */
+/* ================= HELPERS & UI CONTROLLERS (REVISI BAGIAN 1) ================= */
 function escapeHtml(s){ const el = document.createElement('div'); el.innerText = s || ''; return el.innerHTML; }
 function escapeXml(s){ return String(s||'').replace(/[<>&"']/g, c=>`&#${c.charCodeAt(0)};`); }
 function safeFilename(s){ return String(s || '').replace(/[^\w.-]/g, '_'); }
@@ -649,7 +805,13 @@ function setupUIControllers() {
     const bottomSheet = document.getElementById('bottomSheet');
     const showDataBtn = document.getElementById('showDataBtn');
     const closeSheetHandle = document.getElementById('closeSheetHandle');
-    const toggleSheet = () => bottomSheet.classList.toggle('visible');
+    const toggleSheet = () => {
+        // Panggil sync saat membuka sheet untuk memastikan input number sudah benar
+        if (!bottomSheet.classList.contains('visible')) {
+            syncTinggiFromInput();
+        }
+        bottomSheet.classList.toggle('visible');
+    }
     showDataBtn.addEventListener('click', toggleSheet);
     closeSheetHandle.addEventListener('click', toggleSheet);
     
@@ -664,22 +826,50 @@ function setupUIControllers() {
         startCamera(videoDevices[nextIndex].deviceId);
     });
 
-    const tinggiRange = document.getElementById('tinggiRange');
-    const tinggiValueDisplay = document.getElementById('tinggiValueDisplay');
-    tinggiRange.addEventListener('input', () => {
-        tinggiValueDisplay.textContent = `${tinggiRange.value} cm`;
-        tinggiInput.value = tinggiRange.value;
-        updateOverlay();
-    });
+
+    // ================= BAGIAN 1: Sinkronisasi Nilai Tinggi Tanaman =================
+    
+    function syncTinggiFromSlider() {
+        const val = tinggiRange.value;
+        tinggiValueDisplay.textContent = `${val} cm`; // 2. Display real-time
+        tinggiInput.value = val; // 1. Sinkronkan ke input number
+        ovTinggi.textContent = `Tinggi: ${val} cm`; // 4. Update overlay
+    }
+
+    function syncTinggiFromInput() {
+        let val = parseInt(tinggiInput.value, 10);
+        const min = parseInt(tinggiRange.min, 10);
+        const max = parseInt(tinggiRange.max, 10);
+        
+        // Batasan nilai
+        if (isNaN(val) || val < min) val = min;
+        if (val > max) val = max;
+        
+        tinggiInput.value = val; // Perbaiki nilai input (jika di luar batas atau NaN)
+        tinggiRange.value = val; // 1. Sinkronkan ke slider
+        tinggiValueDisplay.textContent = `${val} cm`; // 2. Display real-time
+        ovTinggi.textContent = `Tinggi: ${val} cm`; // 4. Update overlay
+    }
+
+    // 5. Inisialisasi: Nilai default "10 cm" (diambil dari default slider di HTML)
+    // Panggil syncFromInput sekali untuk memastikan semua elemen terupdate dengan nilai awal 10
+    syncTinggiFromInput(); 
+
+    // Jika slider digeser (real-time update)
+    tinggiRange.addEventListener('input', syncTinggiFromSlider);
+    
+    // Jika input number diubah dan focus hilang (nilai final)
+    tinggiInput.addEventListener('change', syncTinggiFromInput);
+    
+    // Tambahkan 'input' pada input number untuk memperbarui display saat mengetik
     tinggiInput.addEventListener('input', () => {
-        const val = parseInt(tinggiInput.value, 10);
-        if(!isNaN(val)) {
-            tinggiValueDisplay.textContent = `${val} cm`;
-            tinggiRange.value = val;
-            updateOverlay();
-        }
+        // Update display dan overlay secara sementara saat mengetik
+        const val = tinggiInput.value;
+        tinggiValueDisplay.textContent = `${val || '...'} cm`;
+        ovTinggi.textContent = `Tinggi: ${val || '-'} cm`; 
     });
-    tinggiInput.value = tinggiRange.value;
+    // ================= END BAGIAN 1 REVISI =================
+
 
     const quickOptionBtns = document.querySelectorAll('.quick-option-btn');
     quickOptionBtns.forEach(btn => {
@@ -697,11 +887,14 @@ function setupUIControllers() {
             updateOverlay();
         });
     });
-    jenisInput.value = document.querySelector('.quick-option-btn.selected').dataset.value;
+    // Ambil nilai default jenis tanaman saat init
+    const initialJenis = document.querySelector('.quick-option-btn.selected');
+    if(initialJenis) jenisInput.value = initialJenis.dataset.value;
+
     
     resetBtn.addEventListener('click', (ev) => { ev.preventDefault(); if(confirm('HAPUS SEMUA DATA LOKAL? Aksi ini tidak dapat dibatalkan.')){ data=[]; saveData(); updateTabel(); renderReview(); updateEntriesCount(); idEntriInput.value = ''; updateOverlay();} });
     clearAllLocalBtn.addEventListener('click', ()=>{ if(confirm('HAPUS SEMUA DATA LOKAL?')){ data=[]; saveData(); updateTabel(); renderReview(); updateEntriesCount(); idEntriInput.value = ''; updateOverlay();} });
-    if(clearFormBtn) clearFormBtn.addEventListener('click', () => { document.querySelectorAll('input[type="text"], input[type="number"]').forEach(input => { if(input.id !== 'idEntri' && input.id !== 'appsScriptUrl') input.value = ''; }); updateOverlay(); });
+    if(clearFormBtn) clearFormBtn.addEventListener('click', () => { document.querySelectorAll('input[type="text"], input[type="number"]').forEach(input => { if(input.id !== 'idEntri' && input.id !== 'appsScriptUrl') input.value = ''; }); syncTinggiFromInput(); updateOverlay(); });
     kirimBtn.addEventListener('click', () => { alert('Fungsi ini untuk mengirim data teks saja. Pengiriman utama terjadi saat mengambil foto.'); });
 }
 </script>
