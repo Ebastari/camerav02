@@ -16,208 +16,872 @@
 <style>
   :root {
     --bg:#0b0f1a; --surface:#111827; --muted:#6b7280; --text:#e5e7eb;
-    /* G4: Warna aksen diubah ke hijau mockup */
-    --accent:#22c55e; --danger:#ef4444; --warn:#f59e0b;
-    --green-bg: rgba(1, 43, 23, 0.75); /* Latar hijau tua transparan */
-    --green-border: rgba(34, 197, 94, 0.4);
+    /* Warna aksen yang lebih menarik */
+    --accent:#10b981; --accent-hover:#059669; --accent-light:rgba(16,185,129,0.15);
+    --danger:#ef4444; --danger-hover:#dc2626;
+    --warn:#f59e0b; --warn-hover:#d97706;
+    --primary:#3b82f6; --primary-hover:#2563eb;
+    --green-bg: rgba(16, 43, 33, 0.85);
+    --green-border: rgba(16, 185, 129, 0.5);
+    --card-bg: rgba(17, 24, 39, 0.85);
+    --card-border: rgba(255, 255, 255, 0.1);
+    --shadow-lg: 0 10px 40px rgba(0, 0, 0, 0.4);
+    --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.2);
   }
-  html,body{height:100%;margin:0;background:#000;color:var(--text);font-family:Inter,system-ui,Segoe UI,Roboto,Arial,sans-serif;overflow:hidden}
-  .app{position:fixed;inset:0;display:flex;flex-direction:column}
-  /* Camera layer */
-  .camera-wrap{position:relative;flex:1;background:#000;display:flex;align-items:center;justify-content:center}
-  video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+  
+  html,body{
+    height:100%;
+    margin:0;
+    background:#000;
+    color:var(--text);
+    font-family:Inter,system-ui,Segoe UI,Roboto,Arial,sans-serif;
+    overflow:hidden
+  }
+  
+  .app{
+    position:fixed;
+    inset:0;
+    display:flex;
+    flex-direction:column
+  }
+  
+  /* Camera layer dengan overlay gradient */
+  .camera-wrap{
+    position:relative;
+    flex:1;
+    background:#000;
+    display:flex;
+    align-items:center;
+    justify-content:center
+  }
+  video{
+    position:absolute;
+    inset:0;
+    width:100%;
+    height:100%;
+    object-fit:cover
+  }
   canvas#canvas{display:none}
   
-  /* G3: Pin di tengah layar */
+  /* Camera overlay vignette effect */
+  .camera-wrap::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(ellipse at center, transparent 40%, rgba(0,0,0,0.3) 80%, rgba(0,0,0,0.6) 100%);
+    pointer-events: none;
+    z-index: 1;
+  }
+
+  /* Pin di tengah layar dengan animasi pulse */
   .map-pin {
     position: absolute;
     top: 50%;
     left: 50%;
-    transform: translate(-50%, -100%); /* Geser pin ke atas shg ujung bawahnya di tengah */
-    font-size: 48px;
+    transform: translate(-50%, -100%);
+    font-size: 40px;
     z-index: 10;
-    color: #ef4444;
-    text-shadow: 0 2px 4px rgba(0,0,0,0.5);
-    pointer-events: none; /* Biar tidak mengganggu klik */
+    color: rgba(239, 68, 68, 0.7);
+    text-shadow: 0 2px 6px rgba(0,0,0,0.5);
+    pointer-events: none;
+    animation: pinPulse 3s ease-in-out infinite;
+    opacity: 0.8;
   }
 
-  /* G7: Toolbar Bawah Baru */
-  .toolbar{position:absolute;bottom:18px;left:0;right:0;display:flex;justify-content:center;gap:12px;z-index:20;align-items:center}
-  .fab{width:70px;height:70px;border-radius:50%;border:6px solid rgba(255,255,255,.9);display:flex;align-items:center;justify-content:center;cursor:pointer}
-  .fab::after{content:"";width:100%;height:100%;background:#fff;border-radius:50%;transition:.1s transform}
-  .fab:active::after{transform:scale(.9)}
-  .btn{background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.25);backdrop-filter:blur(6px);color:#fff;border-radius:14px;padding:10px 14px;cursor:pointer}
-  .btn.round{width:52px;height:52px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:22px; transition: background-color 0.3s, color 0.3s;}
-  /* G7: Style untuk thumbnail */
+  @keyframes pinPulse {
+    0%, 100% { transform: translate(-50%, -100%) scale(1); }
+    50% { transform: translate(-50%, -100%) scale(1.1); }
+  }
+
+  /* Toolbar Bawah dengan floating effect */
+  .toolbar{
+    position:absolute;
+    bottom:28px;
+    left:0;
+    right:0;
+    display:flex;
+    justify-content:center;
+    gap:16px;
+    z-index:20;
+    align-items:center;
+    padding: 0 20px;
+  }
+  
+  .fab {
+    width:72px;
+    height:72px;
+    border-radius:50%;
+    border:4px solid rgba(255,255,255,0.95);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    cursor:pointer;
+    background: linear-gradient(135deg, #fff 0%, #f0f0f0 100%);
+    box-shadow: 0 4px 20px rgba(0,0,0,0.4), 0 0 0 2px rgba(255,255,255,0.1);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  
+  .fab::after{
+    content:"";
+    width:56px;
+    height:56px;
+    background:#fff;
+    border-radius:50%;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: inset 0 2px 4px rgba(0,0,0,0.1);
+  }
+  
+  .fab:hover {
+    transform: scale(1.05);
+    box-shadow: 0 6px 30px rgba(0,0,0,0.5), 0 0 0 4px rgba(16,185,129,0.3);
+  }
+  
+  .fab:active {
+    transform: scale(0.95);
+  }
+  
+  .fab:active::after{
+    transform: scale(0.85);
+    background: var(--accent);
+  }
+  
+  .btn{
+    background:rgba(255,255,255,0.12);
+    border:1px solid rgba(255,255,255,0.25);
+    backdrop-filter:blur(10px);
+    -webkit-backdrop-filter:blur(10px);
+    color:#fff;
+    border-radius:16px;
+    padding:12px 18px;
+    cursor:pointer;
+    font-weight:500;
+    font-size:14px;
+    transition: all 0.2s ease;
+    box-shadow: var(--shadow-sm);
+  }
+  
+  .btn:hover {
+    background:rgba(255,255,255,0.2);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+  }
+  
+  .btn:active {
+    transform: translateY(0);
+  }
+  
+  .btn.round{
+    width:56px;
+    height:56px;
+    border-radius:50%;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-size:24px;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  
+  .btn.round:hover {
+    background:rgba(255,255,255,0.25);
+    transform: scale(1.1);
+  }
+  
+  .btn.round:active {
+    transform: scale(0.9);
+    background:rgba(255,255,255,0.3);
+  }
+  
+  /* Style untuk thumbnail */
   #btnLastPhoto {
     padding: 0;
-    width: 52px;
-    height: 52px;
-    border-radius: 50%; /* Sesuai mockup, tombol bulat */
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
     overflow: hidden;
-    border: 2px solid #fff;
-    background: #333;
+    border: 3px solid rgba(255,255,255,0.9);
+    background: #1f2937;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+    transition: all 0.3s ease;
   }
+  
+  #btnLastPhoto:hover {
+    border-color: var(--accent);
+    box-shadow: 0 0 20px rgba(16,185,129,0.4);
+  }
+  
   #lastPhotoThumb {
     width: 100%;
     height: 100%;
     object-fit: cover;
   }
 
-  /* G1: Header Baru */
+  /* Header dengan gradient */
   .header {
     position: absolute;
-    top: 12px; /* Disesuaikan dengan safe-area */
+    top: 12px;
     left: 0;
     right: 0;
     text-align: center;
     font-size: 14px;
     font-weight: 600;
-    color: #fff;
-    text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+    color: rgba(255,255,255,0.85);
+    text-shadow: 0 2px 8px rgba(0,0,0,0.6);
     z-index: 21;
     pointer-events: none;
+    letter-spacing: 0.5px;
   }
   
-  /* G2: Top chips (di bawah header) */
-  .topbar{position:absolute;top: 40px;left:12px;right:12px;display:flex;justify-content:space-between;gap:8px;z-index:20;flex-wrap:wrap}
-  .chip{background:rgba(0,0,0,.45);border:1px solid rgba(255,255,255,.15);border-radius:999px;padding:8px 12px;font-size:13px;margin-top:4px; transition: background-color 0.3s;}
-  /* G2: Style GPS Aktif */
+  /* Top chips (di bawah header) dengan improved styling */
+  .topbar{
+    position:absolute;
+    top: 50px;
+    left:16px;
+    right:16px;
+    display:flex;
+    justify-content:space-between;
+    gap:12px;
+    z-index:20;
+    flex-wrap:wrap;
+  }
+  
+  .chip{
+    background:rgba(0,0,0,0.35);
+    border:1px solid rgba(255,255,255,0.1);
+    border-radius:10px;
+    padding:8px 12px;
+    font-size:12px;
+    margin-top:4px;
+    transition: all 0.3s ease;
+    backdrop-filter:blur(8px);
+    -webkit-backdrop-filter:blur(8px);
+  }
+  
+  .chip:hover {
+    background:rgba(0,0,0,0.5);
+    border-color: rgba(255,255,255,0.2);
+  }
+  
+  /* Style GPS Aktif */
   #chipGPS {
     display: flex;
     align-items: center;
     gap: 6px;
+    min-width: 90px;
   }
+  
   #chipGPS .dot {
     width: 10px;
     height: 10px;
     border-radius: 50%;
     background-color: var(--muted);
-    transition: background-color 0.3s;
+    transition: all 0.3s ease;
   }
-  #chipGPS.gps-good .dot { background-color: var(--accent); }
-  #chipGPS.gps-medium .dot { background-color: var(--warn); }
-  #chipGPS.gps-bad .dot { background-color: var(--danger); }
   
-  /* G2: Style Target Progress Bar */
-  .chip#chipGoal {
-    min-width: 130px;
-    padding: 6px 12px;
+  #chipGPS.gps-good .dot { 
+    background-color: var(--accent);
   }
-  #chipGoalText { font-size: 12px; }
+  #chipGPS.gps-medium .dot { 
+    background-color: var(--warn);
+  }
+  #chipGPS.gps-bad .dot { 
+    background-color: var(--danger);
+  }
+  
+  /* Style Target Progress Bar */
+  .chip#chipGoal {
+    min-width: 120px;
+    padding: 8px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  
+  #chipGoalText { 
+    font-size: 11px;
+    font-weight: 600;
+  }
+  
   .goal-bar {
     width: 100%;
-    height: 5px;
-    background: rgba(255,255,255,0.2);
+    height: 4px;
+    background: rgba(255,255,255,0.1);
     border-radius: 99px;
-    margin-top: 4px;
     overflow: hidden;
   }
+  
   #goalBarFill {
     display: block;
     height: 100%;
-    width: 0%; /* Diupdate via JS */
+    width: 0%;
     background: var(--accent);
     border-radius: 99px;
-    transition: width 0.5s;
+    transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
   }
 
-  /* G4: Overlay info box (sesuai mockup) */
+  /* Overlay info box */
   .overlay{
     position:absolute;
-    left:10px; right:10px;
-    bottom: 280px; /* Posisi disesuaikan di atas quick selector */
+    left:16px;
+    right:16px;
+    bottom: 300px;
     z-index:15;
-    background: var(--green-bg);
-    border: 1px solid var(--green-border);
-    backdrop-filter:blur(6px);
-    padding:10px 14px;
+    background: rgba(0,0,0,0.25);
+    border: 1px solid rgba(255,255,255,0.1);
+    backdrop-filter:blur(8px);
+    -webkit-backdrop-filter:blur(8px);
+    padding:12px 14px;
     border-radius:12px;
-    min-width:220px;
-    cursor: default; /* Tidak bisa digeser lagi */
+    min-width:240px;
+    cursor: default;
+    box-shadow: none;
+    transition: all 0.3s ease;
   }
-  .overlay h4{margin:0 0 8px 0;font-size:15px; font-weight: 600; color: #fff;}
-  .overlay .row{font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,"Liberation Mono","Courier New",monospace;font-size:13px;line-height:1.6; color: #e0e0e0;}
-  .overlay .row .label { color: #a0a0a0; }
-  .overlay .row .value { color: #fff; font-weight: 500; }
   
-  /* G6: Slider tinggi (posisi disesuaikan) */
-  .height-wrap{position:absolute;left:0;right:0;bottom: 150px;display:flex;justify-content:center;z-index:14}
-  .height-panel{width:min(520px,92%);background:rgba(0,0,0,.45);border:1px solid rgba(255,255,255,.18);border-radius:16px;padding:10px 14px}
-  #tinggiRange{width:100%}
-  .value{font-weight:700}
+  .overlay:hover {
+    transform: none;
+    box-shadow: none;
+  }
   
-  /* G5: Quick options (posisi dan style disesuaikan) */
+  .overlay h4{
+    margin:0 0 8px 0;
+    font-size:14px; 
+    font-weight: 700; 
+    color: rgba(255,255,255,0.9);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  
+  .overlay h4::before {
+    content: '';
+    width: 3px;
+    height: 14px;
+    background: rgba(16,185,129,0.8);
+    border-radius: 2px;
+  }
+  
+  .overlay .row{
+    font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,"Liberation Mono","Courier New",monospace;
+    font-size:12px;
+    line-height:1.6; 
+    color: rgba(255,255,255,0.8);
+    display: flex;
+    justify-content: space-between;
+    padding: 2px 0;
+    border-bottom: none;
+  }
+  
+  .overlay .row:last-child {
+    border-bottom: none;
+  }
+  
+  .overlay .row .label { 
+    color: rgba(255,255,255,0.5); 
+    font-weight: 500;
+  }
+  
+  .overlay .row .value { 
+    color: rgba(255,255,255,0.95); 
+    font-weight: 600;
+  }
+
+  /* Slider tinggi */
+  .height-wrap{
+    position:absolute;
+    left:0;
+    right:0;
+    bottom: 160px;
+    display:flex;
+    justify-content:center;
+    z-index:14
+  }
+  
+  .height-panel{
+    width:min(540px,92%);
+    background: rgba(0,0,0,0.25);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius:14px;
+    padding:12px 16px;
+    backdrop-filter:blur(8px);
+    -webkit-backdrop-filter:blur(8px);
+    box-shadow: none;
+    transition: all 0.3s ease;
+  }
+  
+  .height-panel:hover {
+    transform: none;
+    box-shadow: none;
+  }
+  
+  #tinggiRange{
+    width:100%;
+    height: 6px;
+    -webkit-appearance: none;
+    appearance: none;
+    background: rgba(255,255,255,0.15);
+    border-radius: 99px;
+    outline: none;
+    margin-top: 10px;
+    cursor: pointer;
+  }
+  
+  #tinggiRange::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: var(--accent);
+    cursor: pointer;
+    box-shadow: 0 2px 8px rgba(16,185,129,0.4);
+    transition: all 0.2s ease;
+  }
+  
+  #tinggiRange::-webkit-slider-thumb:hover {
+    transform: scale(1.1);
+    box-shadow: 0 4px 12px rgba(16,185,129,0.5);
+  }
+  
+  #tinggiRange::-moz-range-thumb {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: var(--accent);
+    cursor: pointer;
+    border: none;
+    box-shadow: 0 2px 8px rgba(16,185,129,0.4);
+  }
+  
+  .height-panel .value{
+    font-weight:700;
+    font-size: 18px;
+    color: var(--accent);
+  }
+
+  /* Quick options */
   .quick{
     position:absolute;
     left:0;
     right:0;
-    bottom: 220px; /* Posisi di atas slider */
+    bottom: 230px;
     display:flex;
-    gap:10px;
+    gap:8px;
     justify-content:center;
     z-index:13;
     pointer-events:none;
-    padding: 0 10px;
-    overflow-x: auto; /* Memungkinkan scroll horizontal jika penuh */
-    justify-content: flex-start; /* Mulai dari kiri */
+    padding: 0 16px;
+    overflow-x: auto;
+    justify-content: flex-start;
   }
-  /* Sembunyikan scrollbar */
-  .quick::-webkit-scrollbar { display: none; }
-  .quick { -ms-overflow-style: none; scrollbar-width: none; }
+  
+  /* Custom scrollbar */
+  .quick::-webkit-scrollbar { 
+    height: 3px; 
+  }
+  
+  .quick::-webkit-scrollbar-track { 
+    background: transparent;
+  }
+  
+  .quick::-webkit-scrollbar-thumb { 
+    background: rgba(16,185,129,0.4);
+    border-radius: 99px;
+  }
+  
+  .quick { -ms-overflow-style: none; scrollbar-width: thin; scrollbar-color: rgba(16,185,129,0.4) transparent; }
   
   .quick .tag{
     pointer-events:auto;
     padding:8px 14px;
-    border-radius: 10px; /* Lebih kotak */
-    border: 1px solid rgba(255,255,255,.25);
-    background: rgba(255,255,255,.12);
+    border-radius: 8px;
+    border: 1px solid rgba(255,255,255,0.15);
+    background: rgba(0,0,0,0.25);
     user-select:none;
     cursor:pointer;
-    font-size: 14px;
-    flex-shrink: 0; /* Agar tidak menyusut */
-  }
-  .tag.on{
-    background:var(--accent);
-    color:#052e12;
-    border-color:var(--accent);
-    font-weight:700;
+    font-size: 13px;
+    font-weight: 500;
+    flex-shrink: 0;
+    transition: all 0.2s ease;
+    backdrop-filter:blur(6px);
+    -webkit-backdrop-filter:blur(6px);
   }
   
-  /* --- Style Lainnya (Bottom Sheet, dll) tidak diubah --- */
-  .sheet{position:fixed;left:0;right:0;bottom:0;height:80vh;background:var(--surface);border-top-left-radius:18px;border-top-right-radius:18px;box-shadow:0 -8px 32px rgba(0,0,0,.45);transform:translateY(100%);transition:.35s transform;z-index:30;display:flex;flex-direction:column}
-  .sheet.visible{transform:translateY(0)}
-  .handle{padding:8px;text-align:center;border-bottom:1px solid rgba(255,255,255,.06);cursor:pointer}
-  .handle .bar{width:50px;height:5px;margin:0 auto;border-radius:3px;background:#374151}
-  .sheet-content{flex:1;overflow:auto;padding:14px;display:grid;grid-template-columns:1fr;gap:14px}
-  .card{background:#0f172a;border:1px solid #1f2937;border-radius:14px;padding:12px}
-  .card h3{margin:0 0 8px 0;font-size:16px}
-  .grid-2{display:grid;grid-template-columns:1fr;gap:12px}
-  @media(min-width:860px){.grid-2{grid-template-columns:1.2fr 1fr}}
-  #map{width:100%;height:320px;border-radius:12px}
-  .toast{position:fixed;right:14px;bottom:14px;background:#111827;color:#e5e7eb;border:1px solid #374151;border-radius:10px;padding:10px 12px;z-index:60;opacity:0;transform:translateY(8px);transition:.2s opacity,.2s transform}
-  .toast.show{opacity:1;transform:translateY(0)}
-  .progress{height:4px;background:#1f2937;border-radius:999px;overflow:hidden;margin-top:6px}
-  .progress>i{display:block;height:100%;width:0;background:linear-gradient(90deg,#22c55e,#3b82f6)}
-  .hr{height:1px;background:#1f2937;margin:8px 0}
-  .muted{color:#94a3b8}
-  input[type="number"],input[type="text"]{width:100%;background:#0b1220;border:1px solid #1f2937;border-radius:10px;padding:10px;color:#e5e7eb;box-sizing: border-box;}
-  label{font-size:12px;color:#9ca3af}
-  .row-flex{display:grid;grid-template-columns:1fr;gap:10px}
-  @media(min-width:500px){.row-flex{grid-template-columns:1fr 1fr}}
-  .download-links a{display:block;padding:10px 12px;border:1px solid #1f2937;border-radius:10px;text-decoration:none;color:#e5e7eb;background:#0b1220;text-align:center}
-  .gps-good { background-color: var(--accent) !important; color: #000 !important; }
-  .gps-medium { background-color: var(--warn) !important; color: #000 !important; }
-  .gps-bad { background-color: var(--danger) !important; color: #fff !important; }
+  .quick .tag:hover {
+    background: rgba(0,0,0,0.4);
+    transform: none;
+    border-color: rgba(255,255,255,0.25);
+  }
+  
+  .tag.on{
+    background: rgba(16,185,129,0.7);
+    color:#fff;
+    border-color: transparent;
+    font-weight:600;
+    box-shadow: none;
+    transform: none;
+  }
+  
+  .tag.on:hover {
+    transform: none;
+    background: rgba(16,185,129,0.85);
+  }
+
+  /* Bottom Sheet dengan improved styling */
+  .sheet{
+    position:fixed;
+    left:0;
+    right:0;
+    bottom:0;
+    height:85vh;
+    background: linear-gradient(180deg, var(--surface) 0%, #0f172a 100%);
+    border-top-left-radius:24px;
+    border-top-right-radius:24px;
+    box-shadow: 0 -10px 40px rgba(0,0,0,0.5);
+    transform:translateY(100%);
+    transition:transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    z-index:30;
+    display:flex;
+    flex-direction:column
+  }
+  
+  .sheet.visible{
+    transform:translateY(0)
+  }
+  
+  .handle{
+    padding:12px;
+    text-align:center;
+    border-bottom:1px solid rgba(255,255,255,0.08);
+    cursor:pointer;
+    transition: background-color 0.2s ease;
+  }
+  
+  .handle:hover {
+    background: rgba(255,255,255,0.02);
+  }
+  
+  .handle .bar{
+    width:50px;
+    height:6px;
+    margin:0 auto;
+    border-radius:3px;
+    background: rgba(255,255,255,0.3);
+    transition: all 0.2s ease;
+  }
+  
+  .handle:hover .bar {
+    background: var(--accent);
+    width: 60px;
+  }
+  
+  .sheet-content{
+    flex:1;
+    overflow:auto;
+    padding:20px;
+    display:grid;
+    grid-template-columns:1fr;
+    gap:20px
+  }
+  
+  .sheet-content::-webkit-scrollbar {
+    width: 6px;
+  }
+  
+  .sheet-content::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  
+  .sheet-content::-webkit-scrollbar-thumb {
+    background: rgba(255,255,255,0.15);
+    border-radius: 3px;
+  }
+  
+  .sheet-content::-webkit-scrollbar-thumb:hover {
+    background: rgba(16,185,129,0.5);
+  }
+
+  /* Cards dengan improved styling */
+  .card{
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-radius:16px;
+    padding:18px;
+    transition: all 0.3s ease;
+    box-shadow: var(--shadow-sm);
+  }
+  
+  .card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 30px rgba(0,0,0,0.4);
+    border-color: rgba(16,185,129,0.3);
+  }
+  
+  .card h3{
+    margin:0 0 14px 0;
+    font-size:17px;
+    font-weight:700;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  
+  .card h3::before {
+    content: '';
+    width: 4px;
+    height: 18px;
+    background: linear-gradient(180deg, var(--accent), #059669);
+    border-radius: 2px;
+  }
+  
+  .grid-2{
+    display:grid;
+    grid-template-columns:1fr;
+    gap:16px
+  }
+  
+  @media(min-width:860px){
+    .grid-2{
+      grid-template-columns:1.2fr 1fr
+    }
+    .row-flex{
+      grid-template-columns:1fr 1fr
+    }
+  }
+  
+  #map{
+    width:100%;
+    height:340px;
+    border-radius:14px;
+    border: 1px solid var(--card-border);
+    transition: all 0.3s ease;
+  }
+  
+  #map:hover {
+    border-color: rgba(16,185,129,0.4);
+    box-shadow: 0 0 20px rgba(16,185,129,0.15);
+  }
+
+  /* Toast dengan improved styling */
+  .toast{
+    position:fixed;
+    right:20px;
+    bottom:100px;
+    background: var(--card-bg);
+    color:#e5e7eb;
+    border: 1px solid var(--card-border);
+    border-radius:14px;
+    padding:14px 18px;
+    z-index:60;
+    opacity:0;
+    transform:translateY(16px) scale(0.95);
+    transition:all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: var(--shadow-lg);
+    max-width: 320px;
+  }
+  
+  .toast.show{
+    opacity:1;
+    transform:translateY(0) scale(1)
+  }
+  
+  .toast.success {
+    border-left: 4px solid var(--accent);
+  }
+  
+  .toast.error {
+    border-left: 4px solid var(--danger);
+  }
+  
+  .toast.warning {
+    border-left: 4px solid var(--warn);
+  }
+  
+  .progress{
+    height:5px;
+    background:rgba(255,255,255,0.1);
+    border-radius:99px;
+    overflow:hidden;
+    margin-top:10px;
+  }
+  
+  .progress>i{
+    display:block;
+    height:100%;
+    width:0;
+    background: linear-gradient(90deg, var(--accent), #34d399);
+    border-radius:99px;
+    transition: width 0.3s ease;
+  }
+  
+  .hr{
+    height:1px;
+    background:rgba(255,255,255,0.08);
+    margin:14px 0;
+  }
+  
+  .muted{
+    color:#9ca3af;
+    font-size:14px;
+  }
+  
+  /* Input fields dengan improved styling */
+  input[type="number"],input[type="text"], select {
+    width:100%;
+    background: rgba(0,0,0,0.3);
+    border: 1px solid var(--card-border);
+    border-radius:12px;
+    padding:12px 14px;
+    color:#e5e7eb;
+    box-sizing: border-box;
+    font-size:14px;
+    transition: all 0.2s ease;
+  }
+  
+  input[type="number"]:focus, input[type="text"]:focus, select:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(16,185,129,0.2);
+    background: rgba(0,0,0,0.4);
+  }
+  
+  input[type="number"]::placeholder, input[type="text"]::placeholder {
+    color: rgba(255,255,255,0.3);
+  }
+  
+  label{
+    font-size:12px;
+    color:#9ca3af;
+    font-weight: 500;
+    margin-bottom: 6px;
+    display: block;
+  }
+  
+  .row-flex{
+    display:grid;
+    grid-template-columns:1fr;
+    gap:14px
+  }
+  
+  @media(min-width:500px){
+    .row-flex{
+      grid-template-columns:1fr 1fr
+    }
+  }
+  
+  /* Download links dengan improved styling */
+  .download-links a{
+    display:block;
+    padding:14px 16px;
+    border: 1px solid var(--card-border);
+    border-radius:12px;
+    text-decoration:none;
+    color:#e5e7eb;
+    background: rgba(255,255,255,0.05);
+    text-align:center;
+    font-weight: 500;
+    transition: all 0.2s ease;
+  }
+  
+  .download-links a:hover {
+    background: rgba(16,185,129,0.15);
+    border-color: var(--accent);
+    color: var(--accent);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+  }
+
+  /* GPS Status styling */
+  .gps-good { 
+    background-color: var(--accent) !important; 
+    color: #fff !important; 
+  }
+  .gps-medium { 
+    background-color: var(--warn) !important; 
+    color: #000 !important; 
+  }
+  .gps-bad { 
+    background-color: var(--danger) !important; 
+    color: #fff !important; 
+  }
+  
   .btn.round.gps-sampling {
     font-size: 14px;
     font-weight: bold;
     color: #000;
     background-color: var(--warn);
+    animation: pulse 1.5s ease-in-out infinite;
   }
-  #ccResult .row { font-family: ui-monospace, monospace; line-height: 1.6; font-size: 13px; }
-  .progress-bar-container {width: 100%;height: 10px;background-color: #1f2937;border-radius: 5px;overflow: hidden;margin: 8px 0;}
-  .progress-bar {height: 100%;border-radius: 5px;transition: width 0.5s ease-out, background-color 0.5s;}
+  
+  @keyframes pulse {
+    0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(245,158,11,0.4); }
+    50% { opacity: 0.8; box-shadow: 0 0 0 10px rgba(245,158,11,0); }
+  }
+  
+  #ccResult .row { 
+    font-family: ui-monospace, monospace; 
+    line-height: 1.8; 
+    font-size: 14px;
+    padding: 6px 0;
+  }
+  
+  .progress-bar-container {
+    width: 100%;
+    height: 10px;
+    background-color: rgba(255,255,255,0.1);
+    border-radius: 8px;
+    overflow: hidden;
+    margin: 10px 0;
+  }
+  
+  .progress-bar {
+    height: 100%;
+    border-radius: 8px;
+    transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  
+  /* Button dengan gradient */
+  .btn-primary {
+    background: linear-gradient(135deg, var(--accent), #059669);
+    color: #fff;
+    border: none;
+    font-weight: 600;
+  }
+  
+  .btn-primary:hover {
+    background: linear-gradient(135deg, #059669, var(--accent));
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(16,185,129,0.4);
+  }
+
+  /* Animasi entrance untuk elemen */
+  @keyframes fadeInUp {
+    from {
+      opacity: 0;
+      transform: translateY(20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  
+  .animate-in {
+    animation: fadeInUp 0.4s ease forwards;
+  }
+
+  /* Loading skeleton */
+  .skeleton {
+    background: linear-gradient(90deg, rgba(255,255,255,0.05) 25%, rgba(255,255,255,0.1) 50%, rgba(255,255,255,0.05) 75%);
+    background-size: 200% 100%;
+    animation: skeleton-loading 1.5s infinite;
+    border-radius: 8px;
+  }
+  
+  @keyframes skeleton-loading {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+  }
 </style>
 </head>
 <body>
@@ -275,10 +939,11 @@
         <img id="lastPhotoThumb" src="" alt="Thumbnail foto terakhir">
       </button>
       <button class="btn round" id="btnGallery" title="Buka Galeri & Analitik">☰</button>
+      <button class="btn round" id="btnSettings" title="Ambil Ulang GPS Presisi">📍</button>
       <div class="fab" id="btnCapture" title="Ambil Foto"></div>
       <button class="btn round" id="btnFlipCamera" title="Balik Kamera">🔄</button>
-      <button class="btn round" id="btnSettings" title="Ambil Ulang GPS Presisi">📍</button>
-          </div>
+      <a href="https://www.montana-tech.info/" class="btn round" title="Kembali ke Menu Utama">←</a>
+    </div>
   </div>
 
   <div class="sheet" id="sheet">
@@ -401,7 +1066,7 @@ let currentStream = null;
 let currentDeviceId = null;
 let captureCountForZip = 0;
 let isWatchingGPS = false;
-let videoDevices = []; // G7: Untuk menyimpan daftar kamera
+let videoDevices = [];
 
 // ============ DOM ============
 const video = document.getElementById('video');
@@ -446,9 +1111,9 @@ const overlayInfo = document.getElementById('overlayInfo');
 const reviewFoto = document.getElementById('reviewFoto');
 const ccResultEl = document.getElementById('ccResult');
 
-let brand = "PT ENERGI BATUBARA LESTARI"; // G1: Nama brand di EXIF diubah
+let brand = "PT ENERGI BATUBARA LESTARI";
 
-// ============ Utils (Tidak Berubah) ============
+// ============ Utils ============
 const pad = (n)=> n.toString().padStart(2,'0');
 const genId = ()=>{
   const d=new Date();
@@ -507,7 +1172,6 @@ function haversine(lat1, lon1, lat2, lon2) {
 }
 
 // ============ Camera ============
-// G7: listCameras diubah untuk menyimpan semua device
 async function listCameras(){
   if(!navigator.mediaDevices?.enumerateDevices) return;
   try {
@@ -538,7 +1202,6 @@ async function startCamera(deviceId){
     showToast("Gagal akses kamera: "+(e.message||e),0);
   }
 }
-// G7: Fungsi baru untuk balik kamera
 function flipCamera() {
   if (videoDevices.length < 2) {
     showToast("Hanya 1 kamera ditemukan", 0);
@@ -555,7 +1218,6 @@ function flipCamera() {
 
 // ============ GPS ============
 function updateGPSUI(text, accuracy) {
-  // G2: Teks GPS diubah sesuai mockup
   if (accuracy <= 10) {
     chipGPSText.textContent = 'GPS: Aktif';
   } else if (accuracy < 999) {
@@ -586,7 +1248,6 @@ function getPreciseGPS() {
     }
 
     isWatchingGPS = true;
-    // G7: Tombol GPS diganti jadi btnSettings
     btnSettings.classList.add('gps-sampling');
     btnSettings.disabled = true;
 
@@ -610,7 +1271,7 @@ function getPreciseGPS() {
       isWatchingGPS = false;
       btnSettings.classList.remove('gps-sampling');
       btnSettings.disabled = false;
-      btnSettings.innerHTML = '📍'; // G7 - Ikon diubah ke pin
+      btnSettings.innerHTML = '📍';
 
       if (samples.length === 0) {
         if (error) reject(error);
@@ -657,7 +1318,7 @@ function getPreciseGPS() {
 
         samples.push({ latitude, longitude, accuracy });
 
-        btnSettings.innerHTML = `📡 ${samples.length}`; // G7
+        btnSettings.innerHTML = `📡 ${samples.length}`;
         updateGPSUI(`GPS: ±${accuracy.toFixed(1)}m`, accuracy);
         
         if (accuracy <= TARGET_ACCURACY && samples.length >= MIN_SAMPLES) {
@@ -677,8 +1338,8 @@ function getPreciseGPS() {
 async function handleGPSButton() {
   if (isWatchingGPS) return;
 
-  btnSettings.innerHTML = '📡'; // G7
-  btnSettings.disabled = true; // G7
+  btnSettings.innerHTML = '📡';
+  btnSettings.disabled = true;
   updateGPSUI('GPS: Mencari...', 999);
 
   try {
@@ -692,7 +1353,7 @@ async function handleGPSButton() {
     
     const gpsText = `GPS: ±${acc}m (n=${n})`;
     updateGPSUI(gpsText, acc);
-    showToast(`✅ GPS presisi diperoleh ${gpsText}`, 1);
+    showToast(`GPS presisi diperoleh ${gpsText}`, 1);
 
     addMapMarker(lat, lon, `Posisi saat ini (${gpsText})`);
 
@@ -701,11 +1362,11 @@ async function handleGPSButton() {
     const errorMsg = `GPS Gagal: ${err.message}`;
     showToast(errorMsg, 0);
     updateGPSUI('GPS: Gagal', 999);
-    btnSettings.innerHTML = '📍'; // G7 - Ikon diubah ke pin
-    btnSettings.disabled = false; // G7
+    btnSettings.innerHTML = '📍';
+    btnSettings.disabled = false;
   }
 }
-// ============ AUTO GPS BACKGROUND MODE ============
+
 function startAutoGPSWatcher() {
   if (!navigator.geolocation) return;
 
@@ -737,14 +1398,7 @@ function startAutoGPSWatcher() {
 }
 
 
-// ============ Overlay drag (DINONAKTIFKAN) ============
-/* G4: Fungsi geser dinonaktifkan
-(function enableDrag(){
-  ...
-})();
-*/
-
-// ============ Slider sync (Tidak Berubah) ============
+// ============ Slider sync ============
 function syncFromRange(){
   const v = parseInt(tinggiRange.value,10);
   tinggiInput.value = v;
@@ -764,7 +1418,7 @@ tinggiRange.addEventListener('input', syncFromRange);
 tinggiInput.addEventListener('change', syncFromInput);
 syncFromInput();
 
-// ============ Quick multi-select jenis (Tidak Berubah) ============
+// ============ Quick multi-select jenis ============
 (function initQuick(){
   const c = document.getElementById('quickContainer');
   c.querySelectorAll('.tag').forEach(tag=>{
@@ -780,11 +1434,10 @@ syncFromInput();
   ovJenis.textContent = "Akasia";
 })();
 
-// ============ Bottom sheet toggle (Tidak Berubah) ============
+// ============ Bottom sheet toggle ============
 function toggleSheet(){ sheet.classList.toggle('visible'); }
-// Event listener dipindah ke bawah
 
-// ============ Map (Tidak Berubah) ============
+// ============ Map ============
 function initMap(){
   map = L.map('map').setView([0,110], 5);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {maxZoom:19, attribution:"© OpenStreetMap"}).addTo(map);
@@ -846,9 +1499,9 @@ function initCharts() {
           min: 2023, 
           max: 2027,
           ticks: {
-            stepSize: 1, // Memastikan langkah per tahun
+            stepSize: 1,
             format: {
-              maximumFractionDigits: 0 // Memaksa tidak ada desimal
+              maximumFractionDigits: 0
             }
           }
         },
@@ -945,7 +1598,7 @@ async function refreshCharts() {
   }
 }
 
-// ============ AI HSV (simple) (Tidak Berubah) ============
+// ============ AI HSV (simple) ============
 function analyzeHSV(imgData){
   const {data:arr,width,height} = imgData;
   let r=0,g=0,b=0,c=0;
@@ -966,14 +1619,13 @@ function analyzeHSV(imgData){
   }
   if(h<0) h+=360;
   let label="Sehat";
-  // G4: Disesuaikan dengan mockup "Baik (Level 4)"
   if(v<0.25 || (h>0 && h<25)) label="Mati (Level 1)";
   else if((h>=25 && h<=65) && v>0.25) label="Merana (Level 2)";
-  else label = "Baik (Level 4)"; // Default
+  else label = "Baik (Level 4)";
   return {h:Math.round(h), s:+s.toFixed(2), v:+v.toFixed(2), label};
 }
 
-// ============ EXIF Writer (Tidak Berubah, kecuali 'Make') ============
+// ============ EXIF Writer ============
 function insertExif(dataUrl, meta){
   if(typeof piexif === 'undefined'){ console.warn('piexif not loaded'); return dataUrl; }
   try{
@@ -995,7 +1647,7 @@ function insertExif(dataUrl, meta){
     const comment = `ID:${meta.id}; Tinggi:${meta.tinggi}cm; Jenis:${meta.jenis}; Lokasi:${meta.koordinat}; Pengawas:${meta.pengawas||''}`;
     const exifObj = {
       "0th": {
-        [piexif.ImageIFD.Make]: brand, // G1
+        [piexif.ImageIFD.Make]: brand,
         [piexif.ImageIFD.Model]: "Web Camera",
         [piexif.ImageIFD.Software]: "v10_Mockup",
         [piexif.ImageIFD.DateTime]: exifTime,
@@ -1020,36 +1672,27 @@ function insertExif(dataUrl, meta){
 async function capture(){
   if(!video.videoWidth){ showToast("Video belum siap",0); return; }
   
-  // --- INI BAGIAN YANG DIPERBAIKI ---
-  // Validasi Tahun Tanam (rentang 2023-2027) dengan logika yang lebih jelas
   let tahun = parseInt(tahunInput.value, 10);
   const tahunSekarang = new Date().getFullYear();
   const minTahun = 2023;
   const maxTahun = 2027;
 
   if (isNaN(tahun)) {
-      // Jika kosong/NaN, default ke tahun sekarang (tapi dibatasi 2023-2027)
       tahun = Math.max(minTahun, Math.min(maxTahun, tahunSekarang));
       showToast(`Tahun tanam diset ke tahun sekarang: ${tahun}`, 0.8);
   } else if (tahun < minTahun) {
-      // Jika di bawah rentang
       tahun = minTahun;
       showToast(`Tahun tanam diset ke minimum: ${tahun}`, 0.8);
   } else if (tahun > maxTahun) {
-      // Jika di atas rentang
       tahun = maxTahun;
       showToast(`Tahun tanam diset ke maksimum: ${tahun}`, 0.8);
   }
-  // Setel nilai yang sudah dikoreksi kembali ke input field
   tahunInput.value = tahun;
-  // --- AKHIR PERBAIKAN ---
 
-  
- if (lastGPS.akurasi > 10) {
-  showToast(`Akurasi kurang bagus (${lastGPS.akurasi}m). Tetap disimpan.`, 0.5);
-}
+  if (lastGPS.akurasi > 10) {
+    showToast(`Akurasi kurang bagus (${lastGPS.akurasi}m). Tetap disimpan.`, 0.5);
+  }
 
-  
   const id = genId();
   const tinggi = parseInt(tinggiInput.value||tinggiRange.value,10) || 10;
   if(tinggi<=0){ showToast("Tinggi tidak valid",0); return; }
@@ -1137,7 +1780,7 @@ async function capture(){
   await Promise.all([
     refreshMarkers(),
     refreshCharts(),
-    renderReview(), // Ini akan mengisi galeri di bottom sheet
+    renderReview(),
     updateCapacityAnalysis()
   ]);
 
@@ -1161,7 +1804,6 @@ async function capture(){
   }
 }
 
-// G2: Diubah untuk update progress bar
 async function updateUICounters() {
   const count = await db.monitoring.count();
   ovCount.textContent = count;
@@ -1170,7 +1812,6 @@ async function updateUICounters() {
   const pct = Math.min(100, (count / goalTarget) * 100);
   chipGoalText.textContent = `Target ${goalTarget} • ${count} selesai`;
   goalBarFill.style.width = pct + '%';
-  // Ubah warna bar jika target tercapai
   if (pct >= 100) {
     goalBarFill.style.backgroundColor = 'var(--warn)';
   } else {
@@ -1187,13 +1828,11 @@ async function renderReview(){
     const img=document.createElement('img');
     const url = URL.createObjectURL(d.foto);
     img.src = url;
-    // img.onload = () => URL.revokeObjectURL(url); // Jangan direvoke dulu jika mau dipakai thumbnail
     
     img.style.width='100%'; img.style.height='90px'; img.style.objectFit='cover'; img.style.borderRadius='8px';
     reviewFoto.appendChild(img);
   });
   
-  // G7: Update thumbnail di tombol jika ada
   if (reviewData.length > 0) {
      const lastImg = reviewFoto.querySelector('img');
      if (lastImg) {
@@ -1202,7 +1841,7 @@ async function renderReview(){
   }
 }
 
-// ============ Upload (Apps Script) (Tidak Berubah) ============
+// ============ Upload (Apps Script) ============
 async function uploadEntry(entry, fotoDataUrl, url) {
   if (!entry || !entry.idx) return;
   
@@ -1218,7 +1857,7 @@ async function uploadEntry(entry, fotoDataUrl, url) {
     await fetch(url, { method:'POST', mode:'no-cors', body: JSON.stringify(payload)});
     
     await db.monitoring.update(entry.idx, { statusUpload: 'synced' });
-    showToast(`📤 Data ${entry.id} terkirim`,1);
+    showToast(`Data ${entry.id} terkirim`,1);
 
   } catch (e) {
     showToast(`Upload ${entry.id} gagal: ${e.message||e}`,0);
@@ -1251,7 +1890,7 @@ async function syncAllPending(){
   statusText.textContent = "Status: Sinkronisasi selesai.";
 }
 
-// ============ Export CSV & ZIP (Tidak Berubah) ============
+// ============ Export CSV & ZIP ============
 async function buildCSV(){
   let csv = "ID,Tanggal,Lokasi,Tinggi,Koordinat,X,Y,Jenis,Tahun,Pengawas,Vendor,Kesehatan,Akurasi,GPS_Sampel,StatusUpload\n"; 
   const allData = await db.monitoring.toArray();
@@ -1290,7 +1929,7 @@ async function autoZipNow(){
   await exportZIP(`monitoring_batch_${Math.ceil(dataCount/10)}.zip`);
 }
 
-// ============ FUNGSI ANALISIS EKOLOGI (Tidak Berubah) ============
+// ============ FUNGSI ANALISIS EKOLOGI ============
 async function analyzeEcology(areaHa = 1.0, idealDensity = 625, idealSpacing = 4, spacingTolerance = 0.25) {
   const all = await db.monitoring.toArray();
   const valid = all.filter(d => parseLatLon(d.koordinat) && d.kesehatan);
@@ -1299,9 +1938,9 @@ async function analyzeEcology(areaHa = 1.0, idealDensity = 625, idealSpacing = 4
     return { error: "Belum ada data untuk dianalisis." };
   }
 
-  const sehat = valid.filter(d => d.kesehatan.startsWith("Baik")); // G4
-  const merana = valid.filter(d => d.kesehatan.startsWith("Merana")); // G4
-  const mati = valid.filter(d => d.kesehatan.startsWith("Mati")); // G4
+  const sehat = valid.filter(d => d.kesehatan.startsWith("Baik"));
+  const merana = valid.filter(d => d.kesehatan.startsWith("Merana"));
+  const mati = valid.filter(d => d.kesehatan.startsWith("Mati"));
 
   const N_sehat = sehat.length;
   const N_merana = merana.length;
@@ -1393,8 +2032,7 @@ async function updateCapacityAnalysis() {
   }
 }
 
-// --- FUNGSI DIPINDAHKAN KE SINI ---
-// ===== Pengecekan Kompatibilitas (DIPERBAIKI) =====
+// ===== Pengechea Kompatibilitas =====
 function checkCompatibility() {
   let issues = [];
   
@@ -1415,20 +2053,14 @@ function checkCompatibility() {
     issues.push("Grafik Chart.js gagal dimuat (perlu internet).");
   }
 
-  // --- INI BAGIAN YANG DIPERBAIKI ---
-  // Kita cek window.isSecureContext. 
-  // 'localhost' dianggap aman oleh browser, meskipun pakai 'http'.
   if (!window.isSecureContext) {
-      // Jika TIDAK aman, kita cek apakah itu karena 'file://'
       if (location.protocol === 'file:') {
           issues.push("Aplikasi tidak bisa dibuka dari 'file:///'. Harap gunakan server lokal (localhost).");
       } 
-      // Cek 'http://' tapi BUKAN localhost
       else if (location.protocol === 'http:' && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
           issues.push("Kamera & GPS memerlukan koneksi aman (HTTPS) atau 'localhost'. Membuka via 'http://' (selain localhost) tidak diizinkan.");
       }
   }
-  // --- AKHIR PERBAIKAN ---
 
   if (issues.length > 0) {
     const errorMsg = "Peringatan Kompatibilitas:\n- " + issues.join("\n- ");
@@ -1444,13 +2076,12 @@ function checkCompatibility() {
     } catch(e) {}
   }
 }
-// --- AKHIR FUNGSI YANG DIPINDAH ---
 
 
-// ============ Events (Diubah) ============
-btnSettings.addEventListener('click', handleGPSButton); // Dulu btnGPS
-btnGallery.addEventListener('click', toggleSheet); // Dulu btnToggleSheet
-btnFlipCamera.addEventListener('click', flipCamera); // Baru
+// ============ Events ============
+btnSettings.addEventListener('click', handleGPSButton);
+btnGallery.addEventListener('click', toggleSheet);
+btnFlipCamera.addEventListener('click', flipCamera);
 
 btnCapture.addEventListener('click', capture);
 document.addEventListener('keydown', (e)=>{ if(e.key==="Enter") capture(); });
@@ -1459,13 +2090,13 @@ document.getElementById('btnExportCSV').addEventListener('click', exportCSV);
 document.getElementById('btnExportZIP').addEventListener('click', ()=>exportZIP());
 document.getElementById('dlCSV').addEventListener('click', (e)=>{e.preventDefault(); exportCSV();});
 document.getElementById('dlZIP').addEventListener('click', (e)=>{e.preventDefault(); exportZIP();});
-handle.addEventListener('click', toggleSheet); // Tetap
+handle.addEventListener('click', toggleSheet);
 
 // ============ Init ============
 (async function init(){
   checkCompatibility();
 
-  // 🔥 Hidupkan GPS otomatis di belakang layar
+  // Hidupkan GPS otomatis di belakang layar
   startAutoGPSWatcher();
 
   try{
@@ -1481,7 +2112,7 @@ handle.addEventListener('click', toggleSheet); // Tetap
     else if(savedUrl){ appsScriptUrlInput.value = savedUrl; }
     appsScriptUrlInput.addEventListener('input', ()=> localStorage.setItem('appsScriptUrl', appsScriptUrlInput.value||""));
     
-    await renderReview(); // Ini akan memuat thumbnail terakhir saat start
+    await renderReview();
   }catch(e){
     console.error(e);
   }
